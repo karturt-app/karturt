@@ -1,0 +1,105 @@
+name: KartuRT V1 UAT isolated fixture read-only plan
+run-name: UAT four-role fixture plan | ${{ github.sha }}
+
+on:
+  push:
+    branches:
+      - codex/v1-uat-preview-migration-workflow-20261103
+    paths:
+      - scripts/v1-uat-preview-fixture.ts
+      - .github/workflows/v1-uat-fixture-plan.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: karturt-v1-uat-fixture-plan
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Verify four-role UAT fixture without database writes
+    if: >-
+      github.repository == 'karturt-app/karturt' &&
+      github.ref == 'refs/heads/codex/v1-uat-preview-migration-workflow-20261103' &&
+      github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: karturt-v1-uat
+    env:
+      APP_ENV: preview
+      DATABASE_ENV: preview
+      KARTURT_UAT_APP_BASE_SHA: ff9b992bd3154d2cfb65dd14bcb0f1de452b29f1
+      KARTURT_PREVIEW_TARGET_ID: quiet-credit-75135059/br-weathered-base-aodwvapx/ep-tiny-base-aocoa7m9/karturt_preview
+      KARTURT_PRODUCTION_TARGET_ID: holy-term-22410117/br-jolly-bonus-azzd71cl/ep-empty-rain-azwe3eb3/karturt_production
+
+    steps:
+      - name: Check out branch exact SHA and full ancestry
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Reject all application changes and unexpected UAT files
+        env:
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          BASE_SHA=ff9b992bd3154d2cfb65dd14bcb0f1de452b29f1
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" HEAD
+          while IFS= read -r file; do
+            case "$file" in
+              ".github/workflows/v1-uat-preview-migrate.yml"|\
+              ".github/workflows/v1-uat-branch-preflight.yml"|\
+              ".github/workflows/v1-uat-branch-migrate.yml"|\
+              ".github/uat/v1-uat-migration-go.json"|\
+              "scripts/v1-uat-preview-migration-preflight.ts"|\
+              "docs/v1-uat-github-runner.md"|\
+              ".github/workflows/v1-uat-fixture-plan.yml"|\
+              ".github/workflows/v1-uat-fixture-apply.yml"|\
+              "scripts/v1-uat-preview-fixture.ts")
+                ;;
+              *)
+                echo "Unauthorized change on UAT fixture plan branch."
+                exit 1
+                ;;
+            esac
+          done < <(git diff --name-only "$BASE_SHA" HEAD)
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install audited dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Type-check unchanged application plus isolated fixture
+        run: npm run typecheck
+
+      - name: Read-only TLS, runtime role, credential format and empty-table plan
+        env:
+          DATABASE_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_URL }}
+          KARTURT_UAT_RESIDENT_PIN: ${{ secrets.KARTURT_UAT_RESIDENT_PIN }}
+          KARTURT_UAT_CHAIRMAN_PASSWORD: ${{ secrets.KARTURT_UAT_CHAIRMAN_PASSWORD }}
+          KARTURT_UAT_TREASURER_PASSWORD: ${{ secrets.KARTURT_UAT_TREASURER_PASSWORD }}
+          KARTURT_UAT_SYSTEM_ADMIN_PASSWORD: ${{ secrets.KARTURT_UAT_SYSTEM_ADMIN_PASSWORD }}
+        run: npx --no-install tsx scripts/v1-uat-preview-fixture.ts --plan
+
+      - name: Record nonsecret preflight summary
+        if: success()
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo "## UAT four-role fixture read-only plan PASS"
+            echo "- Source commit: $SOURCE_SHA"
+            echo "- Isolated database: karturt_preview; PostgreSQL 18"
+            echo "- Four distinct synthetic accounts + one RT/household + twelve 2026 dues planned"
+            echo "- Database writes: 0"
+            echo "- Live Production deployments: not triggered by this workflow"
+          } >> "$GITHUB_STEP_SUMMARY"
