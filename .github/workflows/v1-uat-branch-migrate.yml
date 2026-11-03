@@ -47,7 +47,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          node <<'NODE'
+          node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
           import { execFileSync } from 'node:child_process';
           const fail = () => {
