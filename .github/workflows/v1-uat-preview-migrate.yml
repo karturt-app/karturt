@@ -1,0 +1,172 @@
+name: KartuRT V1 UAT Preview migration
+run-name: V1 UAT Preview | ${{ inputs.operation }} | ${{ inputs.candidate_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Run read-only preflight or separately approved UAT migration"
+        required: true
+        default: preflight
+        type: choice
+        options:
+          - preflight
+          - migrate
+      candidate_sha:
+        description: "Exact 40-character SHA currently at main (after workflow is reviewed and merged)"
+        required: true
+        type: string
+      preflight_run_id:
+        description: "Required for migrate: successful separate preflight run ID for the same SHA"
+        required: false
+        type: string
+      migration_go:
+        description: "Required for migrate: APPLY_16_UAT_MIGRATIONS"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: karturt-v1-uat-preview-migration
+  cancel-in-progress: false
+
+jobs:
+  controlled-uat-migration:
+    name: Exact-SHA Preview migration (never Production)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: karturt-v1-uat
+    env:
+      APP_ENV: preview
+      DATABASE_ENV: preview
+      KARTURT_PREVIEW_TARGET_ID: quiet-credit-75135059/br-weathered-base-aodwvapx/ep-tiny-base-aocoa7m9/karturt_preview
+      KARTURT_PRODUCTION_TARGET_ID: holy-term-22410117/br-jolly-bonus-azzd71cl/ep-empty-rain-azwe3eb3/karturt_production
+
+    steps:
+      - name: Authorize exact main SHA and separate preflight GO
+        env:
+          INPUT_CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          INPUT_OPERATION: ${{ inputs.operation }}
+          INPUT_PREFLIGHT_RUN_ID: ${{ inputs.preflight_run_id }}
+          INPUT_MIGRATION_GO: ${{ inputs.migration_go }}
+          EVENT_SHA: ${{ github.sha }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node <<'NODE'
+          async function main() {
+            const sha = process.env.INPUT_CANDIDATE_SHA;
+            const operation = process.env.INPUT_OPERATION;
+            if (!/^[0-9a-f]{40}$/.test(sha || "") || sha !== process.env.EVENT_SHA) {
+              throw new Error("Dispatch rejected: SHA must be the exact selected main commit.");
+            }
+            if (operation !== "preflight" && operation !== "migrate") {
+              throw new Error("Dispatch rejected: unsupported operation.");
+            }
+            if (operation === "preflight") {
+              if (process.env.INPUT_MIGRATION_GO || process.env.INPUT_PREFLIGHT_RUN_ID) {
+                throw new Error("Do not provide migration authorization inputs for preflight.");
+              }
+              console.log("Authorized read-only Preview preflight at exact main SHA.");
+              return;
+            }
+            if (process.env.INPUT_MIGRATION_GO !== "APPLY_16_UAT_MIGRATIONS") {
+              throw new Error("Explicit migration GO phrase missing or invalid.");
+            }
+            const priorId = process.env.INPUT_PREFLIGHT_RUN_ID || "";
+            if (!/^[1-9][0-9]{7,15}$/.test(priorId) || priorId === process.env.CURRENT_RUN_ID) {
+              throw new Error("Migration requires a distinct successful preflight workflow run ID.");
+            }
+            const repository = process.env.GH_REPOSITORY;
+            const url = "https://api.github.com/repos/" + repository + "/actions/runs/" + priorId;
+            const response = await fetch(url, {
+              headers: {
+                authorization: "Bearer " + process.env.GH_TOKEN,
+                accept: "application/vnd.github+json",
+                "x-github-api-version": "2022-11-28",
+              },
+            });
+            if (!response.ok) throw new Error("Cannot verify independent preflight evidence.");
+            const prior = await response.json();
+            const workflowPath = String(prior.path || "").split("@")[0];
+            if (
+              prior.event !== "workflow_dispatch" ||
+              prior.head_branch !== "main" ||
+              prior.head_sha !== sha ||
+              prior.status !== "completed" ||
+              prior.conclusion !== "success" ||
+              workflowPath !== ".github/workflows/v1-uat-preview-migrate.yml" ||
+              prior.display_title !== "V1 UAT Preview | preflight | " + sha
+            ) {
+              throw new Error("Preflight evidence does not match the same exact-SHA UAT workflow.");
+            }
+            console.log("Authorized UAT migration after independent successful preflight run " + priorId + ".");
+          }
+          main().catch(() => {
+            console.error("UAT migration authorization rejected. Verify SHA, prior preflight and GO.");
+            process.exitCode = 1;
+          });
+          NODE
+
+      - name: Check out exact authorized source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
+
+      - name: Verify checkout and migration tool
+        env:
+          EXPECTED_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA" || exit 1
+          test -f scripts/v1-uat-preview-migration-preflight.ts || exit 1
+          test -f drizzle/meta/_journal.json || exit 1
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install exact-SHA dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Official Preview migration plan (no database connection)
+        env:
+          DATABASE_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_URL }}
+        run: npm run db:migrate:preview:plan
+
+      - name: Verify both Preview role connections and TLS without writes
+        env:
+          DATABASE_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_URL }}
+          DATABASE_MIGRATION_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_MIGRATION_URL }}
+        run: npx --no-install tsx scripts/v1-uat-preview-migration-preflight.ts
+
+      - name: Apply only official migrations 0000-0015 on approved Preview
+        if: inputs.operation == 'migrate'
+        env:
+          DATABASE_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_URL }}
+          DATABASE_MIGRATION_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_MIGRATION_URL }}
+        run: npm run db:migrate:preview
+
+      - name: Record safe operation summary
+        if: success()
+        env:
+          OPERATION: ${{ inputs.operation }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          {
+            echo "## KartuRT V1 isolated UAT"
+            echo "- Operation: $OPERATION"
+            echo "- Source SHA: $CANDIDATE_SHA"
+            echo "- Neon project: quiet-credit-75135059"
+            echo "- Database: karturt_preview"
+            echo "- Official chain: 0000–0015"
+            echo "- App Production / production DB: not targeted"
+          } >> "$GITHUB_STEP_SUMMARY"
