@@ -206,13 +206,32 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
-  // Never emit raw driver messages, URL, password or the synthetic PIN in CI logs.
-  const code = error && typeof error === "object" && "code" in error &&
-    typeof error.code === "string" && /^[A-Z0-9_]{3,30}$/.test(error.code)
-    ? error.code : "unspecified";
+  // Never print raw error messages, SQL, credentials, URL or the synthetic PIN.
+  // This diagnosis emits only validated SQLSTATE / known table / error-class labels.
+  const faults: Array<{ type: string; code: string }> = [];
+  let current: unknown = error;
+  for (let level = 0; level < 4 && current && typeof current === "object"; level++) {
+    const object = current as { name?: unknown; code?: unknown; cause?: unknown };
+    const type = typeof object.name === "string" && /^[a-zA-Z]{2,60}$/.test(object.name)
+      ? object.name : "OtherError";
+    const code = typeof object.code === "string" && /^[A-Z0-9_]{3,30}$/.test(object.code)
+      ? object.code : "unspecified";
+    faults.push({ type, code });
+    current = object.cause;
+  }
+  const message = error instanceof Error ? error.message : "";
+  const failingTable = Object.keys(canonicalR2SyntheticFixtureTableCounts)
+    .find(table => message.includes('"' + table + '"')) ?? "unspecified";
+  const semanticReason = message.includes("canonical staging row counts") ? "fixture_expected_row_count_mismatch" :
+    message.includes("synthetic fixture verification did not pass") ? "fixture_postwrite_verification_failed" :
+    message.includes("before hari ini") ? "synthetic_business_date_rejected" :
+    message.includes("Tarif") ? "fee_rate_or_billing_conflict" :
+    "unclassified";
   console.error(JSON.stringify({
     event: "uat-preview.fixture.failed",
-    code,
+    faults,
+    failingTable,
+    semanticReason,
     credentialValuesLogged: false,
   }));
   process.exitCode = 1;
