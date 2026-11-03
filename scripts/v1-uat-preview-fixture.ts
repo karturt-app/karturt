@@ -5,6 +5,7 @@ import type { AnyPgTable } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { createDatabasePool, isVerifiedNodeTlsSocket } from "@/db/pool";
 import { relationalSchema, schema } from "@/db/schema";
+import type { AppDatabase } from "@/db/client";
 import { officialMigrationCount, officialMigrationTags } from "@/db/migration-chain";
 import { assertPreviewConnectionTarget, parsePreviewTargetIdentity } from "@/db/preview-target";
 import { requireDatabaseEnvironment } from "@/lib/env";
@@ -76,7 +77,7 @@ function officialJournalMatchesSource() {
     journal.entries.every((entry, index) => entry.tag === officialMigrationTags[index]);
 }
 
-async function tableCounts(database: ReturnType<typeof drizzle<typeof relationalSchema>>) {
+async function tableCounts(database: AppDatabase) {
   const entries = await Promise.all((Object.values(schema) as AnyPgTable[]).map(async (table) => {
     const [row] = await database.select({ value: count() }).from(table);
     return [getTableName(table), row?.value ?? -1] as const;
@@ -164,7 +165,7 @@ async function main() {
     }
 
     const database = drizzle({ client: pool, schema: relationalSchema });
-    const before = await tableCounts(database);
+    const before = await tableCounts(database as unknown as AppDatabase);
     const allEmpty = Object.values(before).every(n => n === 0);
     if (!allEmpty || Object.keys(before).length !== Object.keys(canonicalR2SyntheticFixtureTableCounts).length) {
       throw new Error("Fixture runner requires all 29 application tables empty; it will not overwrite existing rows.");
@@ -184,7 +185,7 @@ async function main() {
     if (output.status !== "created") {
       throw new Error("Fixture runner did not create a new canonical synthetic fixture.");
     }
-    const after = await tableCounts(database);
+    const after = await tableCounts(database as unknown as AppDatabase);
     if (!countsMatch(after, canonicalR2SyntheticFixtureTableCounts)) {
       throw new Error("Post-bootstrap synthetic fixture totals differ from the frozen ledger.");
     }
