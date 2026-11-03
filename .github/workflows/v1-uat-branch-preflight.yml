@@ -53,6 +53,7 @@ jobs:
             case "$file" in
               ".github/workflows/v1-uat-preview-migrate.yml"|\
               ".github/workflows/v1-uat-branch-preflight.yml"|\
+              ".github/workflows/v1-uat-branch-migrate.yml"|\
               "scripts/v1-uat-preview-migration-preflight.ts"|\
               "docs/v1-uat-github-runner.md")
                 ;;
