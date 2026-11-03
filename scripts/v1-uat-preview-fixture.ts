@@ -24,8 +24,8 @@ const target = {
 const productionReference =
   "holy-term-22410117/br-jolly-bonus-azzd71cl/ep-empty-rain-azwe3eb3/karturt_production";
 const appBaselineSha = "ff9b992bd3154d2cfb65dd14bcb0f1de452b29f1";
-const fixtureBusinessDate = "2025-12-20"; // Creates billing year 2026 for current UAT.
-const billingYear = 2026;
+const fixtureBusinessDate = "2026-11-03"; // Uses official future-only January 2027 tariff; never backdate tariffs.
+const billingYear = 2027;
 const runtimeRole = "karturt_preview_runtime_f4";
 
 type RuntimeEvidence = {
