@@ -141,7 +141,6 @@ async function inspectRole(
         row.session_role !== expectedRole ||
         row.server_version < 180000 ||
         row.server_version >= 190000 ||
-        !row.postgres_tls_active ||
         !row.can_login ||
         row.superuser ||
         row.createdb ||
@@ -170,7 +169,7 @@ async function inspectRole(
         role: expectedRole,
         pgMajor: 18,
         verifiedNodeTls: true,
-        postgresTlsActive: true,
+        postgresTlsActive: row.postgres_tls_active,
         scopedPrivileges: true,
         emptySyntheticDatabase: true,
       }));
