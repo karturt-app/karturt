@@ -7,6 +7,7 @@ on:
       - codex/v1-uat-preview-migration-workflow-20261103
     paths:
       - .github/workflows/v1-uat-branch-preflight.yml
+      - scripts/v1-uat-preview-migration-preflight.ts
 
 permissions:
   contents: read
