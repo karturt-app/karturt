@@ -156,6 +156,8 @@ async function inspectRole(
   }
 }
 
+let diagnosticPhase: "configuration" | "runtime" | "migration" | "complete" = "configuration";
+
 async function main() {
   const environment = requireDatabaseEnvironment();
   if (environment.appEnv !== "preview" || environment.databaseEnv !== "preview") {
@@ -176,8 +178,13 @@ async function main() {
     throw new Error("A separate one-off Preview migration credential is required.");
   }
   assertOfficialMigrationJournal();
+  diagnosticPhase = "runtime";
+  console.info("UAT Preview role check: runtime connection (no password output).");
   await inspectRole(environment.databaseUrl, "runtime", runtimeRole);
+  diagnosticPhase = "migration";
+  console.info("UAT Preview role check: migrator connection (no password output).");
   await inspectRole(migrationUrl, "migration", migrationRole);
+  diagnosticPhase = "complete";
   console.info(JSON.stringify({
     event: "uat-preview.migration-preflight.pass",
     projectId: target.projectId,
@@ -190,8 +197,16 @@ async function main() {
   }));
 }
 
-main().catch(() => {
-  // Deliberately do not print raw connection errors: some drivers include credential-bearing URLs.
-  console.error("UAT Preview read-only preflight FAILED. Check secrets, TLS, target identity, privileges, and empty state privately.");
+main().catch((error: unknown) => {
+  // Log only whitelisted, nonsecret diagnostic fields. Driver messages may contain credentials.
+  const code = error && typeof error === "object" && "code" in error &&
+    typeof error.code === "string" && /^[A-Z0-9_]{3,30}$/.test(error.code)
+      ? error.code : "unspecified";
+  console.error(JSON.stringify({
+    event: "uat-preview.migration-preflight.failed",
+    phase: diagnosticPhase,
+    sqlOrTransportCode: code,
+    privateCredentialValuesIncluded: false,
+  }));
   process.exitCode = 1;
 });
