@@ -1,0 +1,157 @@
+name: KartuRT V1 UAT branch-only guarded migration
+run-name: UAT isolated migration GO | ${{ github.sha }}
+
+on:
+  push:
+    branches:
+      - codex/v1-uat-preview-migration-workflow-20261103
+    paths:
+      - .github/uat/v1-uat-migration-go.json
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: karturt-v1-uat-branch-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Guarded UAT-only official migrations (write only isolated Neon)
+    if: >-
+      github.repository == 'karturt-app/karturt' &&
+      github.ref == 'refs/heads/codex/v1-uat-preview-migration-workflow-20261103' &&
+      github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: karturt-v1-uat
+    env:
+      APP_ENV: preview
+      DATABASE_ENV: preview
+      KARTURT_PREVIEW_TARGET_ID: quiet-credit-75135059/br-weathered-base-aodwvapx/ep-tiny-base-aocoa7m9/karturt_preview
+      KARTURT_PRODUCTION_TARGET_ID: holy-term-22410117/br-jolly-bonus-azzd71cl/ep-empty-rain-azwe3eb3/karturt_production
+
+    steps:
+      - name: Check out exact UAT branch source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Authorize one-time GO with successful independent preflight evidence (no secrets)
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          node <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const fail = () => {
+            throw new Error('UAT migration GO rejected: check prior successful preflight evidence, exact unchanged app baseline, target and authorization marker.');
+          };
+          const baseline = 'ff9b992bd3154d2cfb65dd14bcb0f1de452b29f1';
+          const ref = 'codex/v1-uat-preview-migration-workflow-20261103';
+          const expectedTarget = 'quiet-credit-75135059/br-weathered-base-aodwvapx/ep-tiny-base-aocoa7m9/karturt_preview';
+          const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (sha !== process.env.EXPECTED_SHA) fail();
+          const ancestor = (oldSha, newSha) => {
+            try {
+              execFileSync('git', ['merge-base', '--is-ancestor', oldSha, newSha], { stdio: 'ignore' });
+              return true;
+            } catch { return false; }
+          };
+          if (!ancestor(baseline, sha)) fail();
+          const allowed = new Set([
+            '.github/workflows/v1-uat-preview-migrate.yml',
+            '.github/workflows/v1-uat-branch-preflight.yml',
+            '.github/workflows/v1-uat-branch-migrate.yml',
+            '.github/uat/v1-uat-migration-go.json',
+            'scripts/v1-uat-preview-migration-preflight.ts',
+            'docs/v1-uat-github-runner.md',
+          ]);
+          const changed = execFileSync('git', ['diff', '--name-only', baseline, 'HEAD'], { encoding: 'utf8' })
+            .trim().split(/\r?\n/).filter(Boolean);
+          if (changed.some(file => !allowed.has(file))) fail();
+          const go = JSON.parse(readFileSync('.github/uat/v1-uat-migration-go.json', 'utf8'));
+          if (
+            go.operation !== 'APPLY_16_UAT_MIGRATIONS' ||
+            go.target !== expectedTarget ||
+            go.appBaselineSha !== baseline ||
+            !Number.isSafeInteger(go.preflightRunId) ||
+            go.preflightRunId < 1 ||
+            typeof go.preflightSha !== 'string' ||
+            !/^[0-9a-f]{40}$/.test(go.preflightSha) ||
+            !ancestor(go.preflightSha, sha) ||
+            Object.keys(go).sort().join(',') !== ['operation','target','appBaselineSha','preflightRunId','preflightSha'].sort().join(',')
+          ) fail();
+          const response = await fetch(
+            'https://api.github.com/repos/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + go.preflightRunId,
+            { headers: {
+              authorization: 'Bearer ' + process.env.GITHUB_TOKEN,
+              accept: 'application/vnd.github+json',
+              'x-github-api-version': '2022-11-28',
+            } },
+          );
+          if (!response.ok) fail();
+          const run = await response.json();
+          if (
+            run.workflow_id !== 405321407 ||
+            run.event !== 'push' ||
+            run.head_branch !== ref ||
+            run.head_sha !== go.preflightSha ||
+            run.status !== 'completed' ||
+            run.conclusion !== 'success' ||
+            !String(run.path || '').startsWith('.github/workflows/v1-uat-branch-preflight.yml')
+          ) fail();
+          console.info(JSON.stringify({
+            event: 'uat-preview.migration-go.authorized',
+            priorReadOnlyPreflightRunId: go.preflightRunId,
+            appBaselineSha: baseline,
+            target: expectedTarget,
+            productionTouched: false,
+          }));
+          NODE
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install audited lockfile without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Official frozen 16-migration plan (no DB writes)
+        env:
+          DATABASE_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_URL }}
+        run: npm run db:migrate:preview:plan
+
+      - name: Repeat strict role, TLS and empty-database preflight (no DB writes)
+        env:
+          DATABASE_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_URL }}
+          DATABASE_MIGRATION_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_MIGRATION_URL }}
+        run: npx --no-install tsx scripts/v1-uat-preview-migration-preflight.ts
+
+      - name: Apply official Drizzle migrations 0000 through 0015 ONLY to isolated Preview
+        env:
+          DATABASE_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_URL }}
+          DATABASE_MIGRATION_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_MIGRATION_URL }}
+        run: npm run db:migrate:preview
+
+      - name: Record nonsecret UAT migration evidence
+        if: success()
+        env:
+          RUN_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo "## Isolated KartuRT V1 Preview migration"
+            echo "- Workflow commit: $RUN_SHA"
+            echo "- Application source baseline: ff9b992bd3154d2cfb65dd14bcb0f1de452b29f1"
+            echo "- Database target: quiet-credit-75135059 / karturt_preview"
+            echo "- Migration chain: 0000–0015 via guarded application CLI"
+            echo "- Live Production application, database and main branch: not targeted"
+          } >> "$GITHUB_STEP_SUMMARY"
