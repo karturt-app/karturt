@@ -99,13 +99,39 @@ async function inspectRole(
   expectedRole: string,
 ) {
   assertPreviewConnectionTarget(url, purpose, process.env);
+  console.info(JSON.stringify({ event: "uat-preview.connection-target.pass", purpose }));
   const pool = createDatabasePool(url, "preview", purpose, 1);
+  console.info(JSON.stringify({ event: "uat-preview.pool-config.pass", purpose }));
   try {
     const client = await pool.connect();
+    console.info(JSON.stringify({ event: "uat-preview.connection-established", purpose }));
     try {
       const verifiedNodeTls = isVerifiedNodeTlsSocket(client.connection.stream);
       const result = await client.query<RoleEvidence>(roleQuery);
       const row = result.rows[0];
+      if (row) {
+        console.info(JSON.stringify({
+          event: "uat-preview.role-checks",
+          purpose,
+          correctDatabase: row.database_name === approvedTarget.database,
+          effectiveRoleMatches: row.role_name === expectedRole,
+          sessionRoleMatches: row.session_role === expectedRole,
+          expectedPgMajor: row.server_version >= 180000 && row.server_version < 190000,
+          verifiedNodeTls,
+          postgresTlsActive: row.postgres_tls_active,
+          loginAllowed: row.can_login,
+          adminAndMembershipsDenied: !(
+            row.superuser || row.createdb || row.createrole || row.replication ||
+            row.bypassrls || row.inherit || row.memberships !== 0
+          ),
+          noDatabaseOwnership: !row.database_owner,
+          connectAllowed: row.can_connect,
+          createMatchesRole: row.can_create_database_objects === (purpose === "migration"),
+          tempDenied: !row.can_use_temp && !row.public_temp_granted,
+          publicSchemaPrivilegesMatch: row.public_usage && row.public_create === (purpose === "migration"),
+          emptyDatabase: row.public_relations === 0 && row.public_routines === 0 && row.drizzle_schemas === 0,
+        }));
+      }
       const expectedCreate = purpose === "migration";
       if (
         !verifiedNodeTls ||
@@ -202,9 +228,20 @@ main().catch((error: unknown) => {
   const code = error && typeof error === "object" && "code" in error &&
     typeof error.code === "string" && /^[A-Z0-9_]{3,30}$/.test(error.code)
       ? error.code : "unspecified";
+  const message = error instanceof Error ? error.message : "";
+  const safeReason =
+    /^Preview (runtime|migration) connection does not match/.test(message) ? "preview_target_or_role_mismatch" :
+    /^Database connection URL/.test(message) ? "database_url_invalid" :
+    /^Strict PostgreSQL channel binding is unsupported/.test(message) ? "unsupported_channel_binding" :
+    /^Unsupported database connection parameter/.test(message) ? "unsupported_connection_parameter" :
+    /^UAT Preview role, TLS, isolation/.test(message) ? "role_tls_or_acl_guard_failed" :
+    /^Preview TLS must/.test(message) ? "tls_configuration_rejected" :
+    /^Remote database TLS certificate verification is disabled/.test(message) ? "tls_verification_disabled" :
+    "connection_or_preflight_error";
   console.error(JSON.stringify({
     event: "uat-preview.migration-preflight.failed",
     phase: diagnosticPhase,
+    reason: safeReason,
     sqlOrTransportCode: code,
     privateCredentialValuesIncluded: false,
   }));
