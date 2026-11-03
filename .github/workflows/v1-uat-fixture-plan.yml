@@ -100,7 +100,7 @@ jobs:
             echo "## UAT four-role fixture read-only plan PASS"
             echo "- Source commit: $SOURCE_SHA"
             echo "- Isolated database: karturt_preview; PostgreSQL 18"
-            echo "- Four distinct synthetic accounts + one RT/household + twelve 2026 dues planned"
+            echo "- Four distinct synthetic accounts + one RT/household + twelve 2027 dues planned"
             echo "- Database writes: 0"
             echo "- Live Production deployments: not triggered by this workflow"
           } >> "$GITHUB_STEP_SUMMARY"
