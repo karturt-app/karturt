@@ -1,0 +1,163 @@
+name: KartuRT V1 UAT isolated fixture apply
+run-name: UAT four-role fixture GO | ${{ github.sha }}
+
+on:
+  push:
+    branches:
+      - codex/v1-uat-preview-migration-workflow-20261103
+    paths:
+      - .github/uat/v1-uat-fixture-go.json
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: karturt-v1-uat-fixture-apply
+  cancel-in-progress: false
+
+jobs:
+  fixture:
+    name: Exact-SHA one-time four-role synthetic fixture (UAT only)
+    if: >-
+      github.repository == 'karturt-app/karturt' &&
+      github.ref == 'refs/heads/codex/v1-uat-preview-migration-workflow-20261103' &&
+      github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: karturt-v1-uat
+    env:
+      APP_ENV: preview
+      DATABASE_ENV: preview
+      KARTURT_UAT_APP_BASE_SHA: ff9b992bd3154d2cfb65dd14bcb0f1de452b29f1
+      KARTURT_PREVIEW_TARGET_ID: quiet-credit-75135059/br-weathered-base-aodwvapx/ep-tiny-base-aocoa7m9/karturt_preview
+      KARTURT_PRODUCTION_TARGET_ID: holy-term-22410117/br-jolly-bonus-azzd71cl/ep-empty-rain-azwe3eb3/karturt_production
+
+    steps:
+      - name: Check out exact authorized UAT fixture
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Authorize independent successful fixture plan and unchanged source (no secrets)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+
+          const fail = () => { throw new Error('UAT fixture authorization denied: check one-time marker, exact SHA, successful independent plan and unchanged source.'); };
+          const head = execFileSync('git', ['rev-parse','HEAD'], {encoding:'utf8'}).trim();
+          const base = 'ff9b992bd3154d2cfb65dd14bcb0f1de452b29f1';
+          const branch = 'codex/v1-uat-preview-migration-workflow-20261103';
+          const target = 'quiet-credit-75135059/br-weathered-base-aodwvapx/ep-tiny-base-aocoa7m9/karturt_preview';
+          if (head !== process.env.EXPECTED_SHA) fail();
+
+          const isAncestor = (a,b) => {
+            try { execFileSync('git',['merge-base','--is-ancestor',a,b],{stdio:'ignore'}); return true; }
+            catch { return false; }
+          };
+          if (!isAncestor(base,head)) fail();
+
+          const allowed = new Set([
+            '.github/workflows/v1-uat-preview-migrate.yml',
+            '.github/workflows/v1-uat-branch-preflight.yml',
+            '.github/workflows/v1-uat-branch-migrate.yml',
+            '.github/uat/v1-uat-migration-go.json',
+            'scripts/v1-uat-preview-migration-preflight.ts',
+            'docs/v1-uat-github-runner.md',
+            '.github/workflows/v1-uat-fixture-plan.yml',
+            '.github/workflows/v1-uat-fixture-apply.yml',
+            '.github/uat/v1-uat-fixture-go.json',
+            'scripts/v1-uat-preview-fixture.ts',
+          ]);
+          const changed = execFileSync('git',['diff','--name-only',base,'HEAD'],{encoding:'utf8'})
+            .trim().split(/\r?\n/).filter(Boolean);
+          if (changed.some(file => !allowed.has(file))) fail();
+
+          const go = JSON.parse(readFileSync('.github/uat/v1-uat-fixture-go.json','utf8'));
+          const keys = Object.keys(go).sort().join(',');
+          if (
+            keys !== ['operation','target','appBaselineSha','planRunId','planSha'].sort().join(',') ||
+            go.operation !== 'CREATE_FOUR_SYNTHETIC_UAT_ACCOUNTS' ||
+            go.target !== target || go.appBaselineSha !== base ||
+            !Number.isSafeInteger(go.planRunId) || go.planRunId < 1 ||
+            typeof go.planSha !== 'string' || !/^[0-9a-f]{40}$/.test(go.planSha) ||
+            !isAncestor(go.planSha,head)
+          ) fail();
+
+          const afterPlan = execFileSync('git',['diff','--name-only',go.planSha,'HEAD'],{encoding:'utf8'}).trim();
+          if (afterPlan !== '.github/uat/v1-uat-fixture-go.json') fail();
+
+          const response = await fetch(
+            'https://api.github.com/repos/' + process.env.REPOSITORY + '/actions/runs/' + go.planRunId,
+            {headers:{
+              authorization:'Bearer ' + process.env.GITHUB_TOKEN,
+              accept:'application/vnd.github+json',
+              'x-github-api-version':'2022-11-28',
+            }}
+          );
+          if (!response.ok) fail();
+          const run = await response.json();
+          if (
+            run.event !== 'push' || run.head_branch !== branch || run.head_sha !== go.planSha ||
+            run.status !== 'completed' || run.conclusion !== 'success' ||
+            !String(run.path || '').startsWith('.github/workflows/v1-uat-fixture-plan.yml')
+          ) fail();
+
+          console.info(JSON.stringify({
+            event:'uat-preview.fixture-authorization.pass',
+            planRunId:go.planRunId,
+            sourceSha:head,
+            appBaselineSha:base,
+            syntheticOnly:true,
+          }));
+          NODE
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install exact lockfile without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Repeat non-writing runtime TLS, credentials and all-table empty checks
+        env:
+          DATABASE_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_URL }}
+          KARTURT_UAT_RESIDENT_PIN: ${{ secrets.KARTURT_UAT_RESIDENT_PIN }}
+          KARTURT_UAT_CHAIRMAN_PASSWORD: ${{ secrets.KARTURT_UAT_CHAIRMAN_PASSWORD }}
+          KARTURT_UAT_TREASURER_PASSWORD: ${{ secrets.KARTURT_UAT_TREASURER_PASSWORD }}
+          KARTURT_UAT_SYSTEM_ADMIN_PASSWORD: ${{ secrets.KARTURT_UAT_SYSTEM_ADMIN_PASSWORD }}
+        run: npx --no-install tsx scripts/v1-uat-preview-fixture.ts --plan
+
+      - name: Create one synthetic RT and four UAT accounts in one guarded transaction
+        env:
+          KARTURT_UAT_FIXTURE_GO: CREATE_FOUR_SYNTHETIC_UAT_ACCOUNTS
+          DATABASE_URL: ${{ secrets.KARTURT_UAT_PREVIEW_DATABASE_URL }}
+          KARTURT_UAT_RESIDENT_PIN: ${{ secrets.KARTURT_UAT_RESIDENT_PIN }}
+          KARTURT_UAT_CHAIRMAN_PASSWORD: ${{ secrets.KARTURT_UAT_CHAIRMAN_PASSWORD }}
+          KARTURT_UAT_TREASURER_PASSWORD: ${{ secrets.KARTURT_UAT_TREASURER_PASSWORD }}
+          KARTURT_UAT_SYSTEM_ADMIN_PASSWORD: ${{ secrets.KARTURT_UAT_SYSTEM_ADMIN_PASSWORD }}
+        run: npx --no-install tsx scripts/v1-uat-preview-fixture.ts --apply
+
+      - name: Summarize only nonsecret fixture counts
+        if: success()
+        env:
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo "## Four-role KartuRT UAT fixture"
+            echo "- Source SHA: $HEAD_SHA"
+            echo "- Isolated Neon DB: karturt_preview"
+            echo "- Synthetic RT units: 1; households: 1; accounts: 4"
+            echo "- Synthetic billing year: 2026; monthly dues: 12"
+            echo "- Production, real resident data and branch main: NOT targeted"
+          } >> "$GITHUB_STEP_SUMMARY"
