@@ -158,6 +158,6 @@ jobs:
             echo "- Source SHA: $HEAD_SHA"
             echo "- Isolated Neon DB: karturt_preview"
             echo "- Synthetic RT units: 1; households: 1; accounts: 4"
-            echo "- Synthetic billing year: 2026; monthly dues: 12"
+            echo "- Synthetic billing year: 2027; monthly dues: 12"
             echo "- Production, real resident data and branch main: NOT targeted"
           } >> "$GITHUB_STEP_SUMMARY"
