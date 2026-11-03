@@ -84,9 +84,10 @@ function assertOfficialMigrationJournal() {
   const journal = JSON.parse(readFileSync(resolve(process.cwd(), "drizzle/meta/_journal.json"), "utf8")) as {
     entries?: Array<{ tag?: string }>;
   };
+  const entries = journal.entries ?? [];
   if (
-    journal.entries?.length !== officialMigrationCount ||
-    journal.entries.some((entry, index) => entry.tag !== officialMigrationTags[index])
+    entries.length !== officialMigrationCount ||
+    entries.some((entry, index) => entry.tag !== officialMigrationTags[index])
   ) {
     throw new Error("UAT migration preflight rejected a non-official Drizzle journal.");
   }
