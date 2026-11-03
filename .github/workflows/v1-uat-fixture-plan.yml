@@ -60,6 +60,7 @@ jobs:
               "docs/v1-uat-github-runner.md"|\
               ".github/workflows/v1-uat-fixture-plan.yml"|\
               ".github/workflows/v1-uat-fixture-apply.yml"|\
+              ".github/uat/v1-uat-fixture-go.json"|\
               "scripts/v1-uat-preview-fixture.ts")
                 ;;
               *)
