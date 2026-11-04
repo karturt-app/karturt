@@ -111,11 +111,15 @@ describe("role authorization", () => {
   it("limits System Admin to system recovery and auditing", () => {
     const administrator = principal("system_admin", { rtUnitId: null, householdId: null, personId: null });
     expect(canPerform(administrator, "system:recover")).toBe(true);
+    expect(canPerform(administrator, "system:health:read")).toBe(true);
     expect(canPerform(administrator, "system:manage")).toBe(true);
     expect(canPerform(administrator, "audit:read")).toBe(true);
     expect(canPerform(administrator, "billing:read:rt")).toBe(false);
     expect(canPerform(administrator, "fee_rate:manage")).toBe(false);
     expect(canPerform(administrator, "waiver:manage")).toBe(false);
     expect(canPerform(administrator, "payment:record_cash")).toBe(false);
+    expect(canPerform(principal("resident"), "system:health:read")).toBe(false);
+    expect(canPerform(principal("treasurer"), "system:health:read")).toBe(false);
+    expect(canPerform(principal("rt_chairman"), "system:health:read")).toBe(false);
   });
 });
