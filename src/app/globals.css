@@ -1284,3 +1284,30 @@ button { color: inherit; }
   .system-health-grid { grid-template-columns: minmax(0, 1fr); }
   .system-health-facts > div { display: grid; }
 }
+
+
+/* Rekening tujuan ditampilkan setelah warga memeriksa nominal pengajuan. */
+.resident-transfer-instructions {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+.payment-request-confirm-actions .resident-transfer-instructions p {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.resident-transfer-account {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.resident-transfer-account > strong { color: var(--teal); }
+.resident-transfer-account-number { font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
