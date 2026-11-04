@@ -56,9 +56,12 @@ export function PaymentNotifications({ accountId, role }: { accountId: string; r
       document.removeEventListener("visibilitychange", visibility);
     };
   }, [accountId, role]);
-  return <section className="app-card payment-notifications" aria-labelledby="payment-notifications-title">
-    <h2 id="payment-notifications-title">Pemberitahuan pembayaran</h2>
-    <p>Status terbaru saat aplikasi terbuka. Diperbarui setiap 30 detik selama tersambung.</p>
+  if (state === "loading" && !feed) return null;
+  if (state === "ready" && feed?.items.length === 0) return null;
+  return <section className="payment-notifications" aria-labelledby="payment-notifications-title">
+    <details className="notification-disclosure">
+      <summary id="payment-notifications-title">Pemberitahuan pembayaran{feed && feed.items.length > 0 ? ` (${feed.items.length})` : state === "expired" ? " · sesi berakhir" : state === "offline" ? " · offline" : " · perlu diperiksa"}</summary>
+      <div className="notification-content">
     {state === "loading" && <p role="status">Memuat pemberitahuan…</p>}
     {state === "offline" && <p role="status">Anda sedang offline. Sambungkan internet untuk memeriksa status terbaru.</p>}
     {state === "error" && <p role="alert">Status belum dapat diperbarui. Coba muat ulang.</p>}
@@ -74,7 +77,9 @@ export function PaymentNotifications({ accountId, role }: { accountId: string; r
         </li>)}
       </ul>}
       {feed.hasMore && <p>Menampilkan 20 terbaru. Periksa daftar pengajuan atau riwayat iuran untuk rincian lainnya.</p>}
-      {role === "resident" && <p>Rincian pengajuan tersedia pada kartu dan riwayat iuran di bawah.</p>}
+      {role === "resident" && <p>Rincian pengajuan tersedia pada kartu dan riwayat iuran.</p>}
     </>}
+      </div>
+    </details>
   </section>;
 }
