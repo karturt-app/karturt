@@ -2,6 +2,8 @@
 
 KartuRT is a mobile-first RT dues administration app. V1 includes annual dues, resident payment requests, Treasurer verification and cash payments, reversals, Chairman household/tariff/waiver and official-term management, reports with monthly/yearly CSV and monthly A4 printing, an audit viewer, bounded System Admin account recovery tools, and an online-only installable PWA. Officials use username + PIN; System Admin retains password + verified TOTP.
 
+Dokumen serah terima untuk klien: [KartuRT V1 — Panduan Serah Terima](docs/HANDOVER-V1.md).
+
 ## Stack
 
 - Next.js App Router, React, and TypeScript
