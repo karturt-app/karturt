@@ -85,6 +85,7 @@ export default async function ChairmanReportsPage({ searchParams }: ChairmanRepo
         <span>Laporan</span>
       </nav>
       <ChairmanReports
+        treasurerMode={principal.role === "treasurer"}
         initialYear={selection.year}
         initialMonth={month}
         rtIdentity={`${rt.name} - RW ${rt.rwCode} - ${rt.village}`}
