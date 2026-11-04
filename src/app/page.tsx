@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight, House, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowUpRight, House, UsersRound } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 
@@ -20,15 +20,12 @@ export default function Home() {
     <main className="page-shell home-shell">
       <header className="topbar">
         <Brand />
-        <span className="topbar-note"><span className="live-dot" />Ruang administrasi warga</span>
       </header>
 
       <section className="home-hero" aria-labelledby="home-title">
         <div className="hero-copy">
-          <p className="eyebrow"><ShieldCheck size={16} aria-hidden="true" />JELAS UNTUK WARGA, TERTATA UNTUK PENGURUS</p>
           <h1 id="home-title">Iuran RT, <span>tercatat rapi.</span></h1>
           <p className="hero-description">Satu tempat untuk melihat informasi iuran dan mengelola administrasi lingkungan dengan lebih mudah.</p>
-          <div className="hero-rule"><span />Data akun dikelola oleh pengurus RT</div>
         </div>
 
         <div className="entry-panel">
@@ -37,7 +34,6 @@ export default function Home() {
               <span className="step-label">MULAI DARI SINI</span>
               <h2>Pilih jenis akun</h2>
             </div>
-            <span className="entry-count">01 <span>/ 02</span></span>
           </div>
           <div className="entry-list">
             {entryPoints.map(({ href, icon: Icon, title, description }, index) => (
@@ -50,12 +46,6 @@ export default function Home() {
           </div>
           <p className="entry-help">Belum mendapat akses? Hubungi pengurus di lingkungan Anda.</p>
         </div>
-      </section>
-
-      <section className="home-note" aria-label="Prinsip akun KartuRT">
-        <div><span className="note-number">01</span><p><strong>Informasi terpisah</strong><br />Setiap akun hanya melihat ruang sesuai tugasnya.</p></div>
-        <div><span className="note-number">02</span><p><strong>Riwayat tetap tertata</strong><br />Perubahan penting dirancang agar dapat ditelusuri.</p></div>
-        <div><span className="note-number">03</span><p><strong>Nyaman di ponsel</strong><br />Tombol dan tulisan dibuat mudah dijangkau dan dibaca.</p></div>
       </section>
 
       <SiteFooter />
