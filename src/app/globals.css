@@ -1311,3 +1311,24 @@ button { color: inherit; }
 }
 .resident-transfer-account > strong { color: var(--teal); }
 .resident-transfer-account-number { font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+
+.resident-transfer-account-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; min-width: 0; }
+.resident-transfer-copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 7px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  color: var(--teal);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.resident-transfer-copy-button:hover { background: var(--teal-wash); }
+.resident-transfer-copy-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.resident-transfer-copy-feedback { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.resident-transfer-copy-feedback:empty { display: none; }
