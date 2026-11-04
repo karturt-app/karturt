@@ -11,13 +11,16 @@ const rupiah = (amount: number) => new Intl.NumberFormat("id-ID", {
   style: "currency", currency: "IDR", maximumFractionDigits: 0,
 }).format(amount);
 
-export function MonthlyReportPrint({ report, rtIdentity, month, onMonthChange }: {
+export function MonthlyReportPrint({ report, rtIdentity, month, onMonthChange, treasurerMode = false }: {
   report: RtFinancialReportResponse;
   rtIdentity: string;
   month: number;
   onMonthChange: (month: number) => void;
+  treasurerMode?: boolean;
 }) {
   const printedAt = useRef<HTMLTimeElement>(null);
+  const reportDetailsRef = useRef<HTMLDetailsElement>(null);
+  const wasOpenBeforePrint = useRef<boolean | null>(null);
   const [downloadError, setDownloadError] = useState("");
   function downloadCsv(scope: "month" | "year") {
     let url: string | undefined;
@@ -42,6 +45,10 @@ export function MonthlyReportPrint({ report, rtIdentity, month, onMonthChange }:
   }
   useEffect(() => {
     function stampPrintTime() {
+      if (treasurerMode && reportDetailsRef.current) {
+        wasOpenBeforePrint.current = reportDetailsRef.current.open;
+        reportDetailsRef.current.open = true;
+      }
       if (!printedAt.current) return;
       const now = new Date();
       printedAt.current.dateTime = now.toISOString();
@@ -49,9 +56,19 @@ export function MonthlyReportPrint({ report, rtIdentity, month, onMonthChange }:
         timeZone: "Asia/Jakarta", dateStyle: "long", timeStyle: "short",
       }).format(now) + " WIB";
     }
+    function restoreDetails() {
+      if (treasurerMode && reportDetailsRef.current && wasOpenBeforePrint.current !== null) {
+        reportDetailsRef.current.open = wasOpenBeforePrint.current;
+        wasOpenBeforePrint.current = null;
+      }
+    }
     window.addEventListener("beforeprint", stampPrintTime);
-    return () => window.removeEventListener("beforeprint", stampPrintTime);
-  }, []);
+    window.addEventListener("afterprint", restoreDetails);
+    return () => {
+      window.removeEventListener("beforeprint", stampPrintTime);
+      window.removeEventListener("afterprint", restoreDetails);
+    };
+  }, [treasurerMode]);
 
   const totals = report.monthly.find((item) => item.month === month);
   if (!totals) return null;
@@ -59,8 +76,8 @@ export function MonthlyReportPrint({ report, rtIdentity, month, onMonthChange }:
     .filter((period) => period.month === month)
     .map((period) => ({ household, period })));
 
-  return (
-    <section className="monthly-report-print chairman-report-panel" aria-labelledby="monthly-print-title">
+  const reportBody = (
+    <>
       <div className="monthly-report-controls">
         <label htmlFor="monthly-print-month">Bulan laporan
           <select id="monthly-print-month" value={month} onChange={(event) => onMonthChange(Number(event.target.value))}>
@@ -110,6 +127,16 @@ export function MonthlyReportPrint({ report, rtIdentity, month, onMonthChange }:
       )}
       <p className="monthly-report-note">Tagihan yang belum jatuh tempo tidak masuk daftar tunggakan. Pembayaran yang dibatalkan tidak dihitung sebagai penerimaan.</p>
       <p className="monthly-report-timestamp">Dicetak: <time ref={printedAt}>diisi saat mencetak</time></p>
+    </>
+  );
+  return (
+    <section className="monthly-report-print chairman-report-panel" aria-labelledby={treasurerMode ? undefined : "monthly-print-title"} aria-label={treasurerMode ? "Laporan bulanan" : undefined}>
+      {treasurerMode ? (
+        <details className="treasurer-report-disclosure treasurer-print-details" ref={reportDetailsRef}>
+          <summary>Laporan bulanan, cetak &amp; unduh CSV</summary>
+          <div className="treasurer-report-disclosure-content">{reportBody}</div>
+        </details>
+      ) : reportBody}
     </section>
   );
 }

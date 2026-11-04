@@ -696,7 +696,7 @@ describe("resident payment request transactions", () => {
       request,
     });
 
-    expect(link).toMatch(/^https:\/\/wa\.me\/628123456789\?text=/);
+    expect(link).toMatch(/^https:\/\/wa\.me\/6281358114984\?text=/);
     const message = new URL(link!).searchParams.get("text") ?? "";
     expect(message).toContain("Nama: Warga Uji");
     expect(message).toContain("Nomor rumah: R-07");

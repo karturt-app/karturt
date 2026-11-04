@@ -15,7 +15,11 @@ import {
   PaymentRequestIdempotencyConflictError,
   PaymentRequestPeriodUnavailableError,
 } from "@/lib/billing/resident-payment-request";
-import { createResidentPaymentWhatsAppLink } from "@/lib/billing/resident-payment-whatsapp";
+import {
+  buildResidentPaymentWhatsAppLink,
+  createResidentPaymentWhatsAppLink,
+  getTreasurerWhatsAppNumber,
+} from "@/lib/billing/resident-payment-whatsapp";
 import { getResidentPaymentRequestHistory, InvalidResidentPaymentHistoryCursorError } from "@/lib/billing/resident-payment-request-history";
 
 export const runtime = "nodejs";
@@ -117,7 +121,37 @@ export async function GET(request: Request) {
       return response("Riwayat permintaan hanya tersedia untuk akun warga.", 403);
     }
     const cursor = new URL(request.url).searchParams.get("cursor") ?? undefined;
-    const history = await getResidentPaymentRequestHistory(getDb(), principal, cursor);
+    const database = getDb();
+    const history = await getResidentPaymentRequestHistory(database, principal, cursor);
+    // WhatsApp is a convenience only; an unavailable contact must never hide the payment history.
+    if (history.requests.some((item) => item.status === "pending")) {
+      try {
+        const [profile, destination] = await Promise.all([
+          getResidentProfile(database, principal),
+          getTreasurerWhatsAppNumber(database, principal.rtUnitId!),
+        ]);
+        if (destination) {
+          const requests = history.requests.map((item) => ({
+            ...item,
+            whatsappUrl: item.status === "pending"
+              ? buildResidentPaymentWhatsAppLink(destination, {
+                  houseNumber: profile.houseNumber,
+                  residentName: profile.name,
+                  request: {
+                    requestCode: item.requestCode,
+                    periods: item.items.map((due) => due.period),
+                    totalAmount: item.totalAmount,
+                    createdAt: item.createdAt,
+                  },
+                })
+              : null,
+          }));
+          return NextResponse.json({ ...history, requests }, { headers: { "cache-control": "no-store" } });
+        }
+      } catch {
+        // History remains available when contact lookup fails.
+      }
+    }
     return NextResponse.json(history, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     if (error instanceof UnauthenticatedError || error instanceof MfaEnrollmentRequiredError) {

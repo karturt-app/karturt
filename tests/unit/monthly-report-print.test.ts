@@ -41,6 +41,19 @@ describe("monthly meeting print report", () => {
     expect(html).toContain("Unduh CSV tahunan");
   });
 
+  it("keeps printing and CSV tools inside an optional Bendahara report panel", () => {
+    const html = renderToStaticMarkup(createElement(MonthlyReportPrint, {
+      report, rtIdentity: "RT Sintetis", month: 4, onMonthChange: () => {},
+      treasurerMode: true,
+    }));
+    expect(html).toContain('class="treasurer-report-disclosure treasurer-print-details"');
+    expect(html).toContain("Laporan bulanan, cetak");
+    expect(html).toContain("Cetak / Simpan PDF");
+    expect(html).toContain("Unduh CSV bulanan");
+    expect(html).toContain("Unduh CSV tahunan");
+    expect(html).toContain("Periode tagihan: April 2026");
+  });
+
   it("shows a truthful empty state instead of carrying arrears from another month", () => {
     const html = renderToStaticMarkup(createElement(MonthlyReportPrint, {
       report, rtIdentity: "RT Sintetis", month: 6, onMonthChange: () => {},

@@ -26,14 +26,13 @@ function rupiah(amount: number) {
   }).format(amount);
 }
 
-export async function createResidentPaymentWhatsAppLink(
+// Single-RT Bendahara WhatsApp contact explicitly designated by the RT owner.
+// Keep assignment validation, but use this contact instead of an outdated profile phone.
+const designatedTreasurerWhatsAppNumber = "6281358114984";
+
+export async function getTreasurerWhatsAppNumber(
   database: AppDatabase,
-  input: {
-    rtUnitId: string;
-    houseNumber: string;
-    residentName: string;
-    request: ResidentPaymentRequestResult;
-  },
+  rtUnitId: string,
 ) {
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
@@ -56,15 +55,26 @@ export async function createResidentPaymentWhatsAppLink(
       eq(people.isActive, true),
     ))
     .where(and(
-      eq(officialAssignments.rtUnitId, input.rtUnitId),
+      eq(officialAssignments.rtUnitId, rtUnitId),
       eq(officialAssignments.role, "treasurer"),
       officialAssignmentActiveOn(today),
     ))
     .limit(2);
 
   if (treasurers.length !== 1) return null;
-  const destination = whatsappNumber(treasurers[0].phone);
-  if (!destination) return null;
+  return whatsappNumber(designatedTreasurerWhatsAppNumber) ?? whatsappNumber(treasurers[0].phone);
+}
+
+export function buildResidentPaymentWhatsAppLink(
+  destination: string,
+  input: {
+    houseNumber: string;
+    residentName: string;
+    request: Pick<ResidentPaymentRequestResult, "requestCode" | "periods" | "totalAmount" | "createdAt">;
+  },
+) {
+  const normalizedDestination = whatsappNumber(destination);
+  if (!normalizedDestination) return null;
 
   const createdAt = new Intl.DateTimeFormat("id-ID", {
     dateStyle: "long",
@@ -80,5 +90,18 @@ export async function createResidentPaymentWhatsAppLink(
     `Waktu pengajuan: ${createdAt} WIB`,
     `Nomor pengajuan: ${input.request.requestCode}`,
   ].join("\n");
-  return `https://wa.me/${destination}?text=${encodeURIComponent(message)}`;
+  return `https://wa.me/${normalizedDestination}?text=${encodeURIComponent(message)}`;
+}
+
+export async function createResidentPaymentWhatsAppLink(
+  database: AppDatabase,
+  input: {
+    rtUnitId: string;
+    houseNumber: string;
+    residentName: string;
+    request: ResidentPaymentRequestResult;
+  },
+) {
+  const destination = await getTreasurerWhatsAppNumber(database, input.rtUnitId);
+  return destination ? buildResidentPaymentWhatsAppLink(destination, input) : null;
 }
