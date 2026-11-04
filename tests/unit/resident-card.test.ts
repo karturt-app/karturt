@@ -7,6 +7,7 @@ import {
   ResidentMonthCard,
   ResidentPaymentRequestPanel,
   ResidentBankTransferInstructions,
+  copyResidentBankAccountNumber,
 } from "../../src/components/resident-card";
 import {
   dueToken,
@@ -46,7 +47,22 @@ describe("resident card semantics", () => {
     expect(text.indexOf("Silahkan transfer")).toBeLessThan(text.indexOf("BANK JATIM"));
     expect(text.indexOf("BANK JATIM")).toBeLessThan(text.indexOf("0122754561"));
     expect(text.indexOf("0122754561")).toBeLessThan(text.indexOf("Konfirmasi dan ajukan"));
-    expect(markup).not.toMatch(/<button|<form/);
+    expect(markup).toMatch(/<button[^>]*type="button"[^>]*>Salin<\/button>/);
+    expect(markup).toContain('aria-label="Salin nomor rekening BANK JATIM"');
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).not.toContain("<form");
+  });
+
+  it("copies only the exact account number without spaces or extra details", async () => {
+    let copied = "";
+    await copyResidentBankAccountNumber(async (value) => { copied = value; });
+    expect(copied).toBe("0122754561");
+  });
+
+  it("keeps clipboard failures observable for safe UI feedback", async () => {
+    await expect(copyResidentBankAccountNumber(async () => {
+      throw new Error("Clipboard unavailable");
+    })).rejects.toThrow("Clipboard unavailable");
   });
 
   it("keeps current domain statuses separate from the future pending visual token", () => {
