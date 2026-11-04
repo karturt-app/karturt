@@ -1,7 +1,7 @@
 "use client";
 
 import { MonthlyReportPrint } from "@/components/monthly-report-print";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, CalendarDays, ChartPie, RotateCcw } from "lucide-react";
 import type { RtFinancialReportResponse } from "@/lib/reports/rt-financial-report";
@@ -254,16 +254,35 @@ function retryButton(onClick: () => void) {
   );
 }
 
+function ReportDisclosure({
+  treasurerMode,
+  title,
+  children,
+}: {
+  treasurerMode: boolean;
+  title: string;
+  children: ReactNode;
+}) {
+  return treasurerMode ? (
+    <details className="treasurer-report-disclosure">
+      <summary>{title}</summary>
+      <div className="treasurer-report-disclosure-content">{children}</div>
+    </details>
+  ) : <>{children}</>;
+}
+
 export function ChairmanReports({
   initialYear,
   initialMonth,
   rtIdentity,
   autoSelectAvailableYear,
+  treasurerMode = false,
 }: {
   initialYear: number;
   initialMonth: number;
   rtIdentity: string;
   autoSelectAvailableYear: boolean;
+  treasurerMode?: boolean;
 }) {
   const router = useRouter();
   const [selectedYear, setSelectedYear] = useState(initialYear);
@@ -362,7 +381,7 @@ export function ChairmanReports({
       <div className="chairman-reports-heading">
         <p className="eyebrow">LAPORAN IURAN</p>
         <h1 id="chairman-reports-title">Laporan iuran</h1>
-        <p>Ringkasan pemasukan dan kewajiban berdasarkan bulan tagihan.</p>
+        <p>{treasurerMode ? "Pilih bagian laporan yang ingin dilihat." : "Ringkasan pemasukan dan kewajiban berdasarkan bulan tagihan."}</p>
       </div>
 
       <div className="chairman-report-year-panel">
@@ -392,7 +411,7 @@ export function ChairmanReports({
 
       {data && !loading && !error && (
         <>
-          <MonthlyReportPrint report={data} rtIdentity={rtIdentity} month={selectedMonth} onMonthChange={(month) => {
+          <MonthlyReportPrint treasurerMode={treasurerMode} report={data} rtIdentity={rtIdentity} month={selectedMonth} onMonthChange={(month) => {
             setSelectedMonth(month);
             router.replace(`/app/laporan?year=${selectedYear}&month=${month}`, { scroll: false });
           }} />
@@ -406,6 +425,7 @@ export function ChairmanReports({
             </div>
           )}
 
+          <ReportDisclosure treasurerMode={treasurerMode} title="Kewajiban menurut periode">
           <section className="chairman-report-panel" aria-labelledby="chairman-report-position-title">
             <div className="chairman-report-panel-heading">
               <div>
@@ -422,7 +442,9 @@ export function ChairmanReports({
               <span>{rupiah(data.dueNowOutstanding)} + {rupiah(data.futureUnpaidOutstanding)} = {rupiah(data.yearly.outstanding)}</span>
             </p>
           </section>
+          </ReportDisclosure>
 
+          <ReportDisclosure treasurerMode={treasurerMode} title="Ringkasan tahunan">
           <section className="chairman-report-panel" aria-labelledby="chairman-report-summary-title">
             <div className="chairman-report-panel-heading">
               <div>
@@ -453,7 +475,9 @@ export function ChairmanReports({
             </p>
             </details>
           </section>
+          </ReportDisclosure>
 
+          <ReportDisclosure treasurerMode={treasurerMode} title="Rincian 12 bulan">
           <section className="chairman-report-section" aria-labelledby="chairman-report-monthly-title">
             <div className="chairman-report-section-heading">
               <div>
@@ -508,7 +532,9 @@ export function ChairmanReports({
               </div>
             </details>
           </section>
+          </ReportDisclosure>
 
+          <ReportDisclosure treasurerMode={treasurerMode} title="Daftar tunggakan">
           <section className="chairman-report-section" aria-labelledby="chairman-report-arrears-title">
             <div className="chairman-report-section-heading">
               <div>
@@ -569,6 +595,7 @@ export function ChairmanReports({
               </div>
             )}
           </section>
+          </ReportDisclosure>
         </>
       )}
     </section>
