@@ -63,6 +63,7 @@ type PaymentRequestHistoryItem = {
   items: Array<{ period: string; amount: number }>;
   totalAmount: number;
   resolutionReason: string | null;
+  whatsappUrl?: string | null;
 };
 
 type PaymentRequestHistoryResponse = {
@@ -127,6 +128,7 @@ export function ResidentPaymentRequestPanel({
     selectedPeriod !== "" && duePeriod(due) <= selectedPeriod,
   );
   const totalAmount = selectedDues.reduce((total, due) => total + due.outstanding, 0);
+  const pendingContact = history.find((item) => item.status === "pending" && item.whatsappUrl);
 
   const refreshHistory = useCallback(async (cursor?: string, append = false) => {
     if (append) setHistoryLoadingMore(true);
@@ -330,6 +332,16 @@ export function ResidentPaymentRequestPanel({
         </div>
       )}
 
+      {!result?.whatsappUrl && historyStatus === "ready" && pendingContact?.whatsappUrl && (
+        <div className="payment-pending-contact">
+          <p><strong>Menunggu konfirmasi Bendahara</strong></p>
+          <p>Pengajuan {pendingContact.requestCode} sudah tercatat. Hubungi Bendahara bila perlu menindaklanjuti.</p>
+          <a className="button button--secondary" href={pendingContact.whatsappUrl} target="_blank" rel="noopener noreferrer">
+            Hubungi Bendahara via WhatsApp
+          </a>
+        </div>
+      )}
+
       <details className="payment-request-history payment-request-history--disclosure" aria-labelledby="payment-request-history-title">
         <summary id="payment-request-history-title">Riwayat permintaan{history.length > 0 ? ` (${history.length}${historyCursor ? "+" : ""})` : ""}</summary>
         {historyStatus === "loading" ? (
@@ -361,6 +373,11 @@ export function ResidentPaymentRequestPanel({
                   <time className="payment-request-resolved-time" dateTime={request.resolvedAt}>
                     Diproses {requestHistoryDate(request.resolvedAt)}
                   </time>
+                )}
+                {request.status === "pending" && request.whatsappUrl && (
+                  <a className="button button--secondary" href={request.whatsappUrl} target="_blank" rel="noopener noreferrer">
+                    Hubungi Bendahara via WhatsApp
+                  </a>
                 )}
                 {request.status === "pending" && (
                   <div className="payment-request-cancel-actions">
