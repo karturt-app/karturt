@@ -441,6 +441,8 @@ export function ChairmanReports({
               <Metric label="Dibebaskan" amount={data.yearly.waived} />
               <Metric label="Tidak ditagih" count={data.yearly.notDueCount} countUnit="tagihan" />
             </dl>
+            <details className="report-calculation-disclosure">
+              <summary>Cara menghitung ringkasan</summary>
             <p className="chairman-report-identity">
               Transfer + tunai = pembayaran terverifikasi.
               <span>{rupiah(data.yearly.transferReceived)} + {rupiah(data.yearly.cashReceived)} = {rupiah(data.yearly.received)}</span>
@@ -449,6 +451,7 @@ export function ChairmanReports({
               Saldo awal impor Sheet2 + pembayaran terverifikasi + dibebaskan + sisa kewajiban = target efektif.
               <span>{rupiah(data.yearly.openingBalanceReceived)} + {rupiah(data.yearly.received)} + {rupiah(data.yearly.waived)} + {rupiah(data.yearly.outstanding)} = {rupiah(data.yearly.effectiveTarget)}</span>
             </p>
+            </details>
           </section>
 
           <section className="chairman-report-section" aria-labelledby="chairman-report-monthly-title">
@@ -459,8 +462,10 @@ export function ChairmanReports({
               </div>
               <span className="chairman-report-section-note">Januari–Desember {data.year}</span>
             </div>
-            <div className="chairman-report-month-list">
-              {data.monthly.map((month) => {
+            <details className="report-months-disclosure">
+              <summary>Tampilkan rincian 12 bulan tahun {data.year}</summary>
+              <div className="chairman-report-month-list">
+                {data.monthly.map((month) => {
                 const monthPeriod = `${data.year}-${String(month.month).padStart(2, "0")}`;
                 const futurePeriod = monthPeriod > data.asOf.period;
                 const currentPeriod = monthPeriod === data.asOf.period;
@@ -500,7 +505,8 @@ export function ChairmanReports({
                   </article>
                 );
               })}
-            </div>
+              </div>
+            </details>
           </section>
 
           <section className="chairman-report-section" aria-labelledby="chairman-report-arrears-title">
