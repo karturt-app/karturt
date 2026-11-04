@@ -4,15 +4,12 @@ import { getResidentProfile } from "@/lib/billing/resident-profile";
 import { jakartaBusinessDate } from "@/lib/officials/lifecycle";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { Brand } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { SignOutButton } from "@/components/sign-out-button";
 import { TreasurerDashboard } from "@/components/treasurer-dashboard";
 import Link from "next/link";
-import { ArrowRight, Banknote, ChartPie, House, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { getDb } from "@/db/client";
-import { authUser } from "@/db/schema";
 import {
   getCurrentPrincipal,
   UnauthenticatedError,
@@ -52,108 +49,69 @@ export default async function AccountHomePage() {
   const treasurerRequests = principal.role === "treasurer"
     ? await getTreasurerPaymentRequestQueue(getDb(), principal)
     : null;
-  const [user] = await getDb()
-    .select({ name: authUser.name })
-    .from(authUser)
-    .where(eq(authUser.id, principal.authUserId))
-    .limit(1);
-
   return (
     <main className="page-shell">
       <header className="topbar">
         <Brand compact />
         <SignOutButton />
       </header>
-      <div className="account-security-menu">
-        {principal.role === "system_admin" && <Link className="button button--secondary" href="/system/akun">Pemulihan akun</Link>}
-        {principal.role === "rt_chairman" && <Link className="button button--secondary" href="/app/pengurus">Jabatan pengurus</Link>}
-        {(principal.role === "rt_chairman" || principal.role === "system_admin") && <Link className="button button--secondary" href="/app/aktivitas">Riwayat aktivitas</Link>}
-        <Link className="button button--secondary account-security-link" href="/app/keamanan">
-          <ShieldCheck size={18} aria-hidden="true" /> Keamanan akun
-        </Link>
-      </div>
-      {(principal.role === "resident" || principal.role === "treasurer") && <PaymentNotifications accountId={principal.appAccountId} role={principal.role} />}
+      <details className="account-tools">
+        <summary>Pengaturan akun</summary>
+        <nav className="account-tools-links" aria-label="Pengaturan akun">
+          {(principal.role === "rt_chairman" || principal.role === "system_admin") && (
+            <Link href="/app/aktivitas">Riwayat aktivitas</Link>
+          )}
+          <Link href="/app/keamanan">Keamanan akun</Link>
+        </nav>
+      </details>
       {profile ? (
-        <ResidentCard profile={profile} businessDate={jakartaBusinessDate()} />
+        <>
+          <PaymentNotifications accountId={principal.appAccountId} role="resident" />
+          <ResidentCard profile={profile} businessDate={jakartaBusinessDate()} />
+        </>
       ) : principal.role === "treasurer" ? (
-        <TreasurerDashboard requests={treasurerRequests ?? []} />
-      ) : (
-        <section className="app-card">
+        <>
+          <TreasurerDashboard requests={treasurerRequests ?? []} />
+          <PaymentNotifications accountId={principal.appAccountId} role="treasurer" />
+        </>
+      ) : principal.role === "rt_chairman" ? (
+        <section className="app-card role-overview" aria-labelledby="chairman-overview-title">
           <span className="account-badge">{roleNames[principal.role]}</span>
-          <p className="eyebrow" style={{ marginTop: 22 }}>
-            AKUN AKTIF
-          </p>
-          <h1>Selamat datang{user?.name ? `, ${user.name}` : ""}.</h1>
-          <p>
-            Akun Anda aktif. Informasi pada halaman ini mengikuti akses akun
-            Anda.
-          </p>
-          {principal.role === "rt_chairman" && (
-            <div className="chairman-tools-grid" aria-label="Pengelolaan iuran">
-              <section className="chairman-tool-card" aria-labelledby="chairman-household-entry-title">
-                <div className="chairman-tool-icon"><House size={22} aria-hidden="true" /></div>
-                <div className="chairman-tool-copy">
-                  <h2 id="chairman-household-entry-title">Rumah dan warga</h2>
-                  <p>Kelola masa tinggal, data warga, dan akses PIN dengan menjaga riwayat tetap utuh.</p>
-                </div>
-                <Link className="chairman-tool-link" href="/app/rumah">
-                  Buka data rumah dan warga <ArrowRight size={18} aria-hidden="true" />
-                </Link>
-              </section>
-              <section className="chairman-tool-card" aria-labelledby="chairman-rate-entry-title">
-                <div className="chairman-tool-icon"><Banknote size={22} aria-hidden="true" /></div>
-                <div className="chairman-tool-copy">
-                  <h2 id="chairman-rate-entry-title">Tarif iuran</h2>
-                  <p>Jadwalkan tarif untuk bulan mendatang dan tinjau riwayat tarif.</p>
-                </div>
-                <Link className="chairman-tool-link" href="/app/tarif">
-                  Buka tarif iuran <ArrowRight size={18} aria-hidden="true" />
-                </Link>
-              </section>
-              <section className="chairman-tool-card" aria-labelledby="chairman-adjustment-entry-title">
-                <div className="chairman-tool-icon"><SlidersHorizontal size={22} aria-hidden="true" /></div>
-                <div className="chairman-tool-copy">
-                  <h2 id="chairman-adjustment-entry-title">Penyesuaian kewajiban</h2>
-                  <p>Tinjau saldo tagihan dan catat perubahan dengan alasan.</p>
-                </div>
-                <Link className="chairman-tool-link" href="/app/penyesuaian">
-                  Buka penyesuaian <ArrowRight size={18} aria-hidden="true" />
-                </Link>
-              </section>
-              <section className="chairman-tool-card" aria-labelledby="chairman-waiver-entry-title">
-                <div className="chairman-tool-icon"><ShieldCheck size={22} aria-hidden="true" /></div>
-                <div className="chairman-tool-copy">
-                  <h2 id="chairman-waiver-entry-title">Pemutihan iuran</h2>
-                  <p>Pilih bulan yang belum dibayar, catat alasan, dan tinjau riwayat keputusan.</p>
-                </div>
-                <Link className="chairman-tool-link" href="/app/pemutihan">
-                  Buka pemutihan iuran <ArrowRight size={18} aria-hidden="true" />
-                </Link>
-              </section>
-              <section className="chairman-tool-card" aria-labelledby="chairman-report-entry-title">
-                <div className="chairman-tool-icon"><ChartPie size={22} aria-hidden="true" /></div>
-                <div className="chairman-tool-copy">
-                  <h2 id="chairman-report-entry-title">Laporan iuran</h2>
-                  <p>Tinjau target, penerimaan, pembebasan, dan tunggakan per periode.</p>
-                </div>
-                <Link className="chairman-tool-link" href="/app/laporan">
-                  Buka laporan iuran <ArrowRight size={18} aria-hidden="true" />
-                </Link>
-              </section>
-            </div>
-          )}
-          {principal.role === "system_admin" && (
-            <>
-              <hr className="status-rule" />
-              <p>
-                Ruang System Admin menangani pemulihan sistem. Akses ini tidak
-                memiliki kewenangan transaksi keuangan.
-              </p>
-            </>
-          )}
-          <div className="app-card-actions">
-            <SignOutButton />
+          <h1 id="chairman-overview-title">Kelola RT</h1>
+          <p>Pilih tugas yang ingin dikerjakan.</p>
+          <div className="role-overview-grid">
+            <section className="role-overview-group" aria-labelledby="chairman-people-title">
+              <h2 id="chairman-people-title">Warga &amp; pengurus</h2>
+              <nav aria-label="Kelola warga dan pengurus">
+                <Link href="/app/rumah">Rumah dan warga</Link>
+                <Link href="/app/pengurus">Jabatan pengurus</Link>
+              </nav>
+            </section>
+            <section className="role-overview-group" aria-labelledby="chairman-report-title">
+              <h2 id="chairman-report-title">Laporan</h2>
+              <nav aria-label="Laporan RT">
+                <Link href="/app/laporan">Laporan iuran</Link>
+              </nav>
+            </section>
           </div>
+          <details className="role-settings">
+            <summary>Pengaturan iuran</summary>
+            <nav aria-label="Pengaturan iuran RT">
+              <Link href="/app/tarif">Tarif iuran</Link>
+              <Link href="/app/penyesuaian">Penyesuaian kewajiban</Link>
+              <Link href="/app/pemutihan">Pemutihan iuran</Link>
+            </nav>
+          </details>
+        </section>
+      ) : (
+        <section className="app-card role-overview" aria-labelledby="admin-overview-title">
+          <span className="account-badge">{roleNames[principal.role]}</span>
+          <h1 id="admin-overview-title">Pemulihan akun</h1>
+          <p>Cari akun dan pulihkan akses sesuai kewenangan Admin. Transaksi keuangan tetap dikelola pengurus RT.</p>
+          <nav className="role-overview-actions" aria-label="Tindakan System Admin">
+            <Link className="button button--primary" href="/system/akun">Cari dan pulihkan akun</Link>
+            <Link className="button button--secondary" href="/app/aktivitas">Riwayat aktivitas</Link>
+          </nav>
         </section>
       )}
       <SiteFooter />
