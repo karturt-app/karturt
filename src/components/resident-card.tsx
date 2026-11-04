@@ -96,13 +96,47 @@ function requestHistoryDate(value: string) {
   }).format(new Date(value));
 }
 
+const RESIDENT_BANK_ACCOUNT_NUMBER = "0122754561";
+
+export async function copyResidentBankAccountNumber(writeText: (value: string) => Promise<void>) {
+  await writeText(RESIDENT_BANK_ACCOUNT_NUMBER);
+}
+
 export function ResidentBankTransferInstructions() {
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  async function copyAccountNumber() {
+    try {
+      await copyResidentBankAccountNumber((value) => navigator.clipboard.writeText(value));
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    }
+  }
+
   return (
     <section className="resident-transfer-instructions" aria-label="Rekening pembayaran">
       <p>Silahkan transfer ke rekening berikut sesuai dengan nominal tertampil :</p>
       <div className="resident-transfer-account">
         <strong>BANK JATIM</strong>
-        <p>No. Rek : <span className="resident-transfer-account-number">0122754561</span></p>
+        <div className="resident-transfer-account-row">
+          <p>No. Rek : <span className="resident-transfer-account-number">{RESIDENT_BANK_ACCOUNT_NUMBER}</span></p>
+          <button
+            className="resident-transfer-copy-button"
+            type="button"
+            aria-label="Salin nomor rekening BANK JATIM"
+            onClick={() => void copyAccountNumber()}
+          >
+            {copyStatus === "copied" ? "Tersalin" : "Salin"}
+          </button>
+        </div>
+        <span className="resident-transfer-copy-feedback" role="status" aria-live="polite">
+          {copyStatus === "copied"
+            ? "Nomor rekening berhasil disalin."
+            : copyStatus === "failed"
+              ? "Tidak bisa menyalin. Salin nomor rekening secara manual."
+              : ""}
+        </span>
         <p>a.n : <strong>SRI WINARSIH</strong></p>
       </div>
       <p>Silahkan tekan <strong>Konfirmasi dan ajukan</strong> jika sudah.</p>
