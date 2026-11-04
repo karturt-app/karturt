@@ -22,6 +22,7 @@ export type Permission =
   | "waiver:manage"
   | "audit:read"
   | "system:recover"
+  | "system:health:read"
   | "system:manage";
 
 export interface Principal {
@@ -49,7 +50,7 @@ const permissions: Record<AppRole, ReadonlySet<Permission>> = {
     "waiver:manage",
     "audit:read",
   ]),
-  system_admin: new Set(["system:recover", "system:manage", "audit:read"]),
+  system_admin: new Set(["system:recover", "system:health:read", "system:manage", "audit:read"]),
 };
 
 const rtScopedPermissions = new Set<Permission>([

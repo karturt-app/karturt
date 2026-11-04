@@ -106,10 +106,11 @@ export default async function AccountHomePage() {
       ) : (
         <section className="app-card role-overview" aria-labelledby="admin-overview-title">
           <span className="account-badge">{roleNames[principal.role]}</span>
-          <h1 id="admin-overview-title">Pemulihan akun</h1>
-          <p>Cari akun dan pulihkan akses sesuai kewenangan Admin. Transaksi keuangan tetap dikelola pengurus RT.</p>
+          <h1 id="admin-overview-title">Operasional sistem</h1>
+          <p>Pantau kondisi aplikasi, pulihkan akses akun, dan tinjau audit. Transaksi keuangan tetap dikelola pengurus RT.</p>
           <nav className="role-overview-actions" aria-label="Tindakan System Admin">
-            <Link className="button button--primary" href="/system/akun">Cari dan pulihkan akun</Link>
+            <Link className="button button--primary" href="/system/kesehatan">Kesehatan sistem</Link>
+            <Link className="button button--secondary" href="/system/akun">Cari dan pulihkan akun</Link>
             <Link className="button button--secondary" href="/app/aktivitas">Riwayat aktivitas</Link>
           </nav>
         </section>
