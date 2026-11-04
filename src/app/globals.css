@@ -1222,3 +1222,37 @@ button { color: inherit; }
   .treasurer-quick-actions .button { flex: 1 1 140px; justify-content: center; }
   .notification-disclosure, .resident-months-disclosure, .report-months-disclosure { padding-inline: 12px; }
 }
+
+
+/* Treasurer WhatsApp follow-up and optional report sections. */
+.payment-pending-contact {
+  margin: 16px 0; padding: 14px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--teal-wash); overflow-wrap: anywhere;
+}
+.payment-pending-contact p { margin: 0 0 9px; font-size: 14px; }
+.payment-pending-contact .button { display: inline-flex; max-width: 100%; min-height: 44px; white-space: normal; }
+.payment-request-history-list > li > a.button { display: inline-flex; margin-top: 12px; min-height: 44px; white-space: normal; }
+
+.treasurer-report-disclosure {
+  min-width: 0; margin-top: 12px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 13px; background: var(--surface);
+}
+.treasurer-report-disclosure > summary {
+  min-height: 52px; display: flex; align-items: center; gap: 10px;
+  list-style: none; cursor: pointer; color: var(--ink); font-size: 16px;
+  font-weight: 750; overflow-wrap: anywhere;
+}
+.treasurer-report-disclosure > summary::-webkit-details-marker { display: none; }
+.treasurer-report-disclosure > summary::after { content: "⌄"; margin-left: auto; color: var(--teal); font-size: 19px; }
+.treasurer-report-disclosure[open] > summary::after { content: "⌃"; }
+.treasurer-report-disclosure-content { min-width: 0; padding-bottom: 14px; }
+.treasurer-report-disclosure-content > .chairman-report-panel,
+.treasurer-report-disclosure-content > .chairman-report-section { margin-top: 0; }
+.treasurer-print-details { margin: 0; padding: 0; border: 0; box-shadow: none; }
+.treasurer-print-details > summary { padding: 0; }
+.treasurer-print-details .monthly-report-controls { padding-top: 12px; }
+@media print {
+  .treasurer-print-details { display: block !important; border: 0 !important; padding: 0 !important; }
+  .treasurer-print-details > summary { display: none !important; }
+  .treasurer-print-details .treasurer-report-disclosure-content { display: block !important; padding: 0 !important; }
+}
