@@ -41,6 +41,7 @@ describe("database pool security configuration", () => {
     }));
     expect(config.ssl).toHaveProperty("checkServerIdentity");
     expect(config.host).toBe("db.example.test");
+    expect(config.max).toBe(5);
     expect(config.application_name).toBe("karturt");
     expect(config).not.toHaveProperty("connectionString");
   });
@@ -94,6 +95,7 @@ describe("database pool security configuration", () => {
     );
 
     expect(config.host).toBe(host);
+    expect(config.max).toBe(1);
     expect(config.ssl).toEqual(expect.objectContaining({ rejectUnauthorized: true, servername: host, ca: expect.any(Array) }));
     expect(config.ssl).toHaveProperty("checkServerIdentity");
   });
