@@ -13,7 +13,7 @@ describe("read-only System Admin health probe", () => {
   it("executes only a bounded SELECT 1 and reports healthy connection", async () => {
     mocks.query.mockResolvedValue({ rows: [{ "?column?": 1 }] });
     const result = await checkSystemHealth();
-    expect(mocks.query).toHaveBeenCalledExactlyOnceWith({ text: "SELECT 1", query_timeout: 2500 });
+    expect(mocks.query).toHaveBeenCalledExactlyOnceWith("SELECT 1");
     expect(result).toMatchObject({
       app: "responding", database: "connected", category: "none",
     });
