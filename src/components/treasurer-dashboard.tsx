@@ -33,39 +33,6 @@ export function TreasurerDashboard({ requests }: { requests: TreasurerPaymentReq
         <p>Periksa permintaan warga dan konfirmasi setelah transfer diterima.</p>
       </div>
 
-      <section className="cash-entry-card" aria-labelledby="cash-entry-title">
-        <div className="cash-entry-icon"><Banknote size={22} aria-hidden="true" /></div>
-        <div className="cash-entry-copy">
-          <h2 id="cash-entry-title">Pembayaran langsung</h2>
-          <p>Catat uang tunai yang diterima Bendahara untuk satu atau beberapa bulan.</p>
-        </div>
-        <Link className="cash-entry-link" href="/app/bendahara/tunai">
-          Catat pembayaran tunai <ArrowRight size={18} aria-hidden="true" />
-        </Link>
-      </section>
-
-      <section className="treasurer-history-entry" aria-labelledby="treasurer-history-entry-title">
-        <div>
-          <p className="eyebrow">CATATAN PEMBAYARAN</p>
-          <h2 id="treasurer-history-entry-title">Riwayat transaksi</h2>
-          <p>Tinjau pembayaran yang sudah dicatat dan kelola pembatalan bila ada kekeliruan.</p>
-        </div>
-        <Link className="button button--secondary" href="/app/bendahara/riwayat">
-          Buka riwayat transaksi <ArrowRight size={18} aria-hidden="true" />
-        </Link>
-      </section>
-
-      <section className="treasurer-history-entry" aria-labelledby="treasurer-report-entry-title">
-        <div>
-          <p className="eyebrow">RAPAT BULANAN</p>
-          <h2 id="treasurer-report-entry-title">Laporan iuran</h2>
-          <p>Tinjau laporan dan cetak ringkasan bulanan untuk rapat RT.</p>
-        </div>
-        <Link className="button button--secondary" href="/app/laporan">
-          <ChartPie size={18} aria-hidden="true" /> Buka laporan iuran
-        </Link>
-      </section>
-
       <div className="treasurer-queue-heading">
         <h2>Menunggu konfirmasi</h2>
         <span className="treasurer-count" aria-label={`${requests.length} permintaan menunggu`}>
@@ -107,6 +74,18 @@ export function TreasurerDashboard({ requests }: { requests: TreasurerPaymentReq
           ))}
         </ol>
       )}
+
+      <nav className="treasurer-quick-actions" aria-label="Tindakan bendahara lainnya">
+        <Link className="button button--secondary" href="/app/bendahara/tunai">
+          <Banknote size={18} aria-hidden="true" /> Catat tunai
+        </Link>
+        <Link className="button button--secondary" href="/app/bendahara/riwayat">
+          <ReceiptText size={18} aria-hidden="true" /> Riwayat transaksi
+        </Link>
+        <Link className="button button--secondary" href="/app/laporan">
+          <ChartPie size={18} aria-hidden="true" /> Laporan
+        </Link>
+      </nav>
     </section>
   );
 }
