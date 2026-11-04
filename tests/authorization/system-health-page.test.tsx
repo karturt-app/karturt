@@ -12,6 +12,7 @@ vi.mock("@/lib/system-health", () => ({ checkSystemHealth: mocks.health }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
   redirect: (path: string) => { throw new Error(`NEXT_REDIRECT:${path}`); },
+  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
 
 import SystemHealthPage from "@/app/system/kesehatan/page";
