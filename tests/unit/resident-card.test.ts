@@ -6,6 +6,7 @@ import {
   ResidentDueStatus,
   ResidentMonthCard,
   ResidentPaymentRequestPanel,
+  ResidentBankTransferInstructions,
 } from "../../src/components/resident-card";
 import {
   dueToken,
@@ -33,6 +34,21 @@ const visibleText = (markup: string) =>
   markup.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<[^>]*>/g, "");
 
 describe("resident card semantics", () => {
+  it("shows the exact designated Bank Jatim account only in the transfer instructions", () => {
+    const markup = renderToStaticMarkup(createElement(ResidentBankTransferInstructions));
+    const text = visibleText(markup);
+
+    expect(text).toContain("Silahkan transfer ke rekening berikut sesuai dengan nominal tertampil :");
+    expect(text).toContain("BANK JATIM");
+    expect(text).toContain("No. Rek : 0122754561");
+    expect(text).toContain("a.n : SRI WINARSIH");
+    expect(text).toContain("Silahkan tekan Konfirmasi dan ajukan jika sudah.");
+    expect(text.indexOf("Silahkan transfer")).toBeLessThan(text.indexOf("BANK JATIM"));
+    expect(text.indexOf("BANK JATIM")).toBeLessThan(text.indexOf("0122754561"));
+    expect(text.indexOf("0122754561")).toBeLessThan(text.indexOf("Konfirmasi dan ajukan"));
+    expect(markup).not.toMatch(/<button|<form/);
+  });
+
   it("keeps current domain statuses separate from the future pending visual token", () => {
     expect(dueToken(due("unpaid", 12))).toBe("UNPAID");
     expect(dueToken(due("paid", 1))).toBe("PAID");
@@ -239,6 +255,7 @@ describe("resident card semantics", () => {
 
     expect(optionValues).toEqual(["2026-09", "2026-10"]);
     expect(markup).not.toContain("2026-11");
+    expect(markup).not.toContain("0122754561"); // Not shown before reviewing the amount.
   });
 
   it("shows a pending request on a future month as pending rather than upcoming", () => {
