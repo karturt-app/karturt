@@ -1123,3 +1123,102 @@ button { color: inherit; }
 .payment-notifications li { padding: 16px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
 .payment-notifications li .button { display: flex; width: fit-content; margin-top: 12px; }
 .payment-notifications .button { min-height: 44px; }
+
+
+/* KartuRT V1 UI cleanup: compact, accessible navigation and progressive disclosure. */
+.home-shell .home-hero { min-height: 0; padding-block: clamp(28px, 5vw, 60px); }
+.home-shell .hero-description { margin-top: 16px; }
+
+.account-tools { align-self: flex-end; margin: 8px 0 4px; max-width: 100%; }
+.account-tools summary,
+.site-footer-details > summary,
+.role-settings > summary,
+.resident-months-disclosure > summary,
+.payment-request-history--disclosure > summary,
+.report-months-disclosure > summary,
+.report-calculation-disclosure > summary,
+.notification-disclosure > summary {
+  min-height: 44px; display: flex; align-items: center; gap: 9px;
+  cursor: pointer; list-style: none; font-weight: 700; color: var(--teal);
+}
+.account-tools summary::-webkit-details-marker,
+.site-footer-details > summary::-webkit-details-marker,
+.role-settings > summary::-webkit-details-marker,
+.resident-months-disclosure > summary::-webkit-details-marker,
+.payment-request-history--disclosure > summary::-webkit-details-marker,
+.report-months-disclosure > summary::-webkit-details-marker,
+.report-calculation-disclosure > summary::-webkit-details-marker,
+.notification-disclosure > summary::-webkit-details-marker { display: none; }
+.account-tools summary::after,
+.site-footer-details > summary::after,
+.role-settings > summary::after,
+.resident-months-disclosure > summary::after,
+.payment-request-history--disclosure > summary::after,
+.report-months-disclosure > summary::after,
+.report-calculation-disclosure > summary::after,
+.notification-disclosure > summary::after { content: "⌄"; font-size: 18px; margin-left: auto; }
+.account-tools[open] summary::after,
+.site-footer-details[open] > summary::after,
+.role-settings[open] > summary::after,
+.resident-months-disclosure[open] > summary::after,
+.payment-request-history--disclosure[open] > summary::after,
+.report-months-disclosure[open] > summary::after,
+.report-calculation-disclosure[open] > summary::after,
+.notification-disclosure[open] > summary::after { content: "⌃"; }
+.account-tools summary { padding: 0 12px; border: 1px solid var(--line); border-radius: 11px; font-size: 14px; }
+.account-tools-links { display: grid; gap: 3px; margin-top: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+.account-tools-links a { min-height: 44px; padding: 10px 13px; border-radius: 8px; }
+.account-tools-links a:hover { background: var(--teal-wash); }
+
+.role-overview { width: min(100%, 780px); margin: 20px auto 30px; }
+.role-overview > p { margin: 6px 0 18px; }
+.role-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.role-overview-group { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); }
+.role-overview-group h2 { margin: 0 0 8px; font-size: 18px; }
+.role-overview-group nav, .role-settings nav { display: grid; gap: 5px; }
+.role-overview-group a, .role-settings a { min-height: 44px; display: flex; align-items: center; padding: 8px 12px; border-radius: 9px; color: var(--teal); font-weight: 700; overflow-wrap: anywhere; }
+.role-overview-group a:hover, .role-settings a:hover { background: var(--teal-wash); }
+.role-settings { margin-top: 12px; padding: 0 16px; border: 1px solid var(--line); border-radius: 12px; }
+.role-settings nav { padding: 0 0 12px; }
+.role-overview-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.treasurer-quick-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.treasurer-quick-actions .button { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; }
+.treasurer-queue-heading { margin-top: 12px; }
+
+.notification-disclosure { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 0 16px; }
+.notification-disclosure summary { font-size: 15px; }
+.notification-content { padding: 0 0 14px; color: var(--ink); }
+.notification-content p { margin: 9px 0; }
+.payment-notifications { width: min(100%, 820px); margin: 10px auto; }
+
+.resident-current-month { margin: 18px 0; }
+.resident-current-month .eyebrow { margin-bottom: 8px; }
+.dues-grid--spotlight { grid-template-columns: minmax(0, 1fr) !important; max-width: 440px; margin: 0; }
+.resident-months-disclosure { margin-top: 18px; padding: 0 16px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); }
+.resident-months-disclosure > .dues-grid { margin: 12px 0 0; }
+.payment-request-history--disclosure { padding-top: 12px; }
+.payment-request-history--disclosure > summary { font-size: 16px; }
+.payment-request-history--disclosure > .payment-request-history-list { margin-top: 12px; }
+.payment-request-history--disclosure > p,
+.payment-request-history--disclosure > div { margin-top: 10px; }
+
+.report-months-disclosure { padding: 0 16px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); }
+.report-months-disclosure .chairman-report-month-list { margin-top: 14px; }
+.report-calculation-disclosure { padding-top: 6px; }
+.report-calculation-disclosure > summary { font-size: 14px; }
+.report-calculation-disclosure .chairman-report-identity { margin: 10px 0; }
+
+.site-footer { min-height: 55px; }
+.site-footer-details { width: 100%; }
+.site-footer-details > summary { width: fit-content; font-size: 13px; }
+.site-footer-content { margin-top: 8px; padding-bottom: 8px; display: grid; gap: 12px; }
+.site-footer-content .footer-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.site-footer-content .pwa-install { flex-basis: auto; }
+
+@media (max-width: 600px) {
+  .role-overview-grid { grid-template-columns: minmax(0, 1fr); }
+  .role-overview { padding: 20px; }
+  .treasurer-quick-actions .button { flex: 1 1 140px; justify-content: center; }
+  .notification-disclosure, .resident-months-disclosure, .report-months-disclosure { padding-inline: 12px; }
+}
