@@ -82,13 +82,14 @@ export function buildResidentPaymentWhatsAppLink(
     timeZone: "Asia/Jakarta",
   }).format(input.request.createdAt);
   const message = [
-    "Halo Bendahara, saya mengajukan pembayaran iuran.",
+    "Halo Ibu Bendahara, saya mengajukan pembayaran iuran.",
     `Nama: ${input.residentName}`,
     `Nomor rumah: ${input.houseNumber}`,
     `Bulan: ${input.request.periods.map(periodLabel).join(", ")}`,
     `Jumlah: ${rupiah(input.request.totalAmount)}`,
     `Waktu pengajuan: ${createdAt} WIB`,
     `Nomor pengajuan: ${input.request.requestCode}`,
+    "Mohon diperiksa. Terimakasih.",
   ].join("\n");
   return `https://wa.me/${normalizedDestination}?text=${encodeURIComponent(message)}`;
 }

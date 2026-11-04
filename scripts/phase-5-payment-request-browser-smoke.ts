@@ -186,13 +186,14 @@ function createMockServer(bundlePath: string) {
       const requestCode = "KRT-SMOKE-5A7B9C";
       const totalAmount = periods.reduce((total, due) => total + due.amount, 0);
       const whatsappText = [
-        "Halo Bendahara, saya mengajukan pembayaran iuran.",
+        "Halo Ibu Bendahara, saya mengajukan pembayaran iuran.",
         "Nama: Warga Uji",
         "Nomor rumah: SMOKE-1",
         "Bulan: Desember 2025, Maret 2026, April 2026",
         "Jumlah: Rp 110.000",
         "Waktu pengajuan: 1 Oktober 2026 pukul 10.00 WIB",
         `Nomor pengajuan: ${requestCode}`,
+        "Mohon diperiksa. Terimakasih.",
       ].join("\n");
       const result = {
         requestCode,

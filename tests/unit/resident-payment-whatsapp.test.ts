@@ -20,12 +20,13 @@ describe("resident payment WhatsApp link", () => {
     expect(url.origin).toBe("https://wa.me");
     expect(url.pathname).toBe("/6281358114984");
     const message = url.searchParams.get("text");
-    expect(message).toContain("Halo Bendahara");
+    expect(message).toContain("Halo Ibu Bendahara");
     expect(message).toContain("Warga Sintetis");
     expect(message).toContain("UJI-5");
     expect(message).toContain("Oktober 2026, November 2026");
     expect(message).toContain("80.000");
     expect(message).toContain(request.requestCode);
+    expect(message).toContain("Mohon diperiksa. Terimakasih.");
   });
 
   it("rejects an invalid WhatsApp destination", () => {
