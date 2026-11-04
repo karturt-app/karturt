@@ -83,7 +83,7 @@ export function createDatabasePoolConfig(
   connectionString: string,
   databaseEnvironment: DatabaseEnvironment,
   purpose: DatabaseConnectionPurpose,
-  max = purpose === "migration" ? 1 : 5,
+  max = purpose === "migration" || databaseEnvironment === "production" ? 1 : 5,
   applicationNameOverride?: string,
 ): PoolConfig {
   let url: URL;
