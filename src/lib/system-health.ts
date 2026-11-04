@@ -45,10 +45,10 @@ function safeIncidentCategory(error: unknown): SafeIncidentCategory {
 
 export async function checkSystemHealth(): Promise<SystemHealthSnapshot> {
   // Only called after verifying the System Admin principal and MFA.
-  // A single read-only statement, a per-query deadline, no polling and no
-  // financial/personal tables keep this check cheap on a one-connection pool.
+  // A single read-only statement, the existing pool connection timeout,
+  // no polling and no financial/personal tables keep this check lightweight.
   try {
-    await getConnection().pool.query({ text: "SELECT 1", query_timeout: 2500 });
+    await getConnection().pool.query("SELECT 1");
     return { app: "responding", database: "connected", category: "none", checkedAt: new Date().toISOString() };
   } catch (error) {
     return {
