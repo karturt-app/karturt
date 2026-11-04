@@ -330,8 +330,8 @@ export function ResidentPaymentRequestPanel({
         </div>
       )}
 
-      <section className="payment-request-history" aria-labelledby="payment-request-history-title">
-        <h3 id="payment-request-history-title">Riwayat permintaan</h3>
+      <details className="payment-request-history payment-request-history--disclosure" aria-labelledby="payment-request-history-title">
+        <summary id="payment-request-history-title">Riwayat permintaan{history.length > 0 ? ` (${history.length}${historyCursor ? "+" : ""})` : ""}</summary>
         {historyStatus === "loading" ? (
           <p role="status">Memuat riwayat…</p>
         ) : historyStatus === "error" ? (
@@ -409,7 +409,7 @@ export function ResidentPaymentRequestPanel({
             {historyLoadingMore ? "Memuat…" : "Riwayat sebelumnya"}
           </button>
         )}
-      </section>
+      </details>
     </section>
   );
 }
@@ -600,6 +600,10 @@ export function ResidentCard({
   ].sort((a, b) => b - a);
   const selected = dues.filter((d) => d.billingYear === year);
   const summary = duesSummary(selected);
+  const months = yearMonths(dues, year);
+  const currentMonth = year === Number(businessDate.slice(0, 4))
+    ? months.find(({ month }) => month === Number(businessDate.slice(5, 7)))
+    : undefined;
   return (
     <section className="resident-area">
       <p className="eyebrow">RUANG WARGA · {profile.rtName}</p>
@@ -678,14 +682,23 @@ export function ResidentCard({
           {tab === "card" ? (
             <>
               <ResidentDuesSummary summary={summary} />
+              {currentMonth && (
+                <section className="resident-current-month" aria-label="Iuran bulan berjalan">
+                  <p className="eyebrow">BULAN BERJALAN</p>
+                  <ol className="dues-grid dues-grid--spotlight">
+                    <ResidentMonthCard name={currentMonth.name} due={currentMonth.due} />
+                  </ol>
+                </section>
+              )}
               <ResidentPaymentRequestPanel dues={dues} onCreated={() => setRetry((r) => r + 1)} />
-              <ol className="dues-grid">
-                {yearMonths(dues, year).map(({ name, month, due }) => {
-                  return (
+              <details className="resident-months-disclosure">
+                <summary>Lihat iuran Januari–Desember {year}</summary>
+                <ol className="dues-grid">
+                  {months.map(({ name, month, due }) => (
                     <ResidentMonthCard key={month} name={name} due={due} />
-                  );
-                })}
-              </ol>
+                  ))}
+                </ol>
+              </details>
             </>
           ) : (
             <>
