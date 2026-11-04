@@ -96,6 +96,20 @@ function requestHistoryDate(value: string) {
   }).format(new Date(value));
 }
 
+export function ResidentBankTransferInstructions() {
+  return (
+    <section className="resident-transfer-instructions" aria-label="Rekening pembayaran">
+      <p>Silahkan transfer ke rekening berikut sesuai dengan nominal tertampil :</p>
+      <div className="resident-transfer-account">
+        <strong>BANK JATIM</strong>
+        <p>No. Rek : <span className="resident-transfer-account-number">0122754561</span></p>
+        <p>a.n : <strong>SRI WINARSIH</strong></p>
+      </div>
+      <p>Silahkan tekan <strong>Konfirmasi dan ajukan</strong> jika sudah.</p>
+    </section>
+  );
+}
+
 export function ResidentPaymentRequestPanel({
   dues,
   onCreated,
@@ -297,6 +311,7 @@ export function ResidentPaymentRequestPanel({
       ) : (
         <div className="payment-request-confirm-actions">
           <p>Pastikan bulan dan jumlahnya sudah benar sebelum mengirim permintaan.</p>
+          <ResidentBankTransferInstructions />
           <button className="button button--primary" type="button" disabled={submitting} onClick={() => void submit()}>
             {submitting ? "Menyimpan…" : "Konfirmasi dan ajukan"}
           </button>
