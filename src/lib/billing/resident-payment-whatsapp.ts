@@ -26,8 +26,8 @@ function rupiah(amount: number) {
   }).format(amount);
 }
 
-// Single-RT designated Bendahara contact, supplied by the RT owner.
-// Used when the active treasurer's profile has no valid WhatsApp number.
+// Single-RT Bendahara WhatsApp contact explicitly designated by the RT owner.
+// Keep assignment validation, but use this contact instead of an outdated profile phone.
 const designatedTreasurerWhatsAppNumber = "6281358114984";
 
 export async function getTreasurerWhatsAppNumber(
@@ -62,7 +62,7 @@ export async function getTreasurerWhatsAppNumber(
     .limit(2);
 
   if (treasurers.length !== 1) return null;
-  return whatsappNumber(treasurers[0].phone) ?? designatedTreasurerWhatsAppNumber;
+  return whatsappNumber(designatedTreasurerWhatsAppNumber) ?? whatsappNumber(treasurers[0].phone);
 }
 
 export function buildResidentPaymentWhatsAppLink(
