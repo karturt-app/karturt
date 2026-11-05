@@ -30,6 +30,8 @@ export type {
   AllocationMethodRow,
   ArrearsHousehold,
   ArrearsPeriod,
+  HouseholdMatrixCell,
+  HouseholdMatrixRow,
   MonthlyReportTotals,
   ReportAmounts,
   ReportCounts,
@@ -102,6 +104,7 @@ async function readAllocationMethodRows(database: ReportDatabase, rtUnitId: stri
       method: payments.method,
       amount: sql<string>`sum(${paymentAllocations.amount})::text`,
       paymentReversed,
+      verifiedAt: payments.verifiedAt,
     })
     .from(paymentAllocations)
     .innerJoin(monthlyDues, and(
@@ -124,6 +127,7 @@ async function readAllocationMethodRows(database: ReportDatabase, rtUnitId: stri
       paymentAllocations.rtUnitId,
       payments.method,
       paymentReversed,
+      payments.verifiedAt,
     );
   return rows as AllocationMethodRow[];
 }
@@ -260,7 +264,7 @@ export async function getRtFinancialReport(
     } else if (waiverEntries.length !== 0) {
       throw new ReportInvariantError();
     }
-    const methods = methodsByDueId.get(due.id) ?? { transferReceived: 0, cashReceived: 0 };
+    const methods = methodsByDueId.get(due.id) ?? { transferReceived: 0, cashReceived: 0, latestPaymentAt: null };
     const verifiedPaymentReceived = methods.transferReceived + methods.cashReceived;
     if (!Number.isSafeInteger(verifiedPaymentReceived) ||
         verifiedPaymentReceived !== balance.activeReceived - balance.importedOpeningBalance) {
@@ -290,6 +294,7 @@ export async function getRtFinancialReport(
       cashReceived: methods.cashReceived,
       waiverAmount: due.status === "waived" ? waiverEntries[0]!.amount : 0,
       hasPendingRequest: balance.hasPendingRequest,
+      latestPaymentAt: methods.latestPaymentAt,
     };
   });
 

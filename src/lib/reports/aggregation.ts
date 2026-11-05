@@ -46,6 +46,21 @@ export type ArrearsHousehold = {
   periods: ArrearsPeriod[];
 };
 
+export type HouseholdMatrixCell = ReportAmounts & {
+  month: number;
+  dueDate: string | null;
+  status: ReportDueStatus | "no_data";
+  pending: boolean;
+  overdue: boolean;
+  latestPaymentAt: string | null;
+};
+
+export type HouseholdMatrixRow = Omit<ReportHouseholdIdentity, "householdId" | "rtUnitId"> & {
+  key: number;
+  months: HouseholdMatrixCell[];
+  latestPaymentAt: string | null;
+};
+
 export type RtFinancialReportResponse = {
   year: number;
   availableYears: number[];
@@ -57,6 +72,7 @@ export type RtFinancialReportResponse = {
   futureUnpaidOutstanding: number;
   yearly: ReportTotals;
   monthly: MonthlyReportTotals[];
+  householdMatrix: HouseholdMatrixRow[];
   arrears: {
     totalOutstanding: number;
     count: number;
@@ -91,6 +107,7 @@ export type ReportDueInput = {
   cashReceived: number;
   waiverAmount: number;
   hasPendingRequest: boolean;
+  latestPaymentAt?: string | null;
 };
 
 export type AllocationMethodRow = {
@@ -100,11 +117,13 @@ export type AllocationMethodRow = {
   method: string;
   amount: number | string;
   paymentReversed: boolean;
+  verifiedAt: Date | string;
 };
 
 export type ActiveMethodTotals = {
   transferReceived: number;
   cashReceived: number;
+  latestPaymentAt: string | null;
 };
 
 const ZERO_TOTALS: ReportTotals = {
@@ -144,8 +163,32 @@ function validDate(value: string) {
   return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === value;
 }
 
+function validTimestamp(value: string) {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
+}
+
 function emptyTotals(): ReportTotals {
   return { ...ZERO_TOTALS };
+}
+
+function emptyHouseholdMatrixCell(month: number): HouseholdMatrixCell {
+  return {
+    month,
+    dueDate: null,
+    status: "no_data",
+    target: 0,
+    effectiveTarget: 0,
+    received: 0,
+    openingBalanceReceived: 0,
+    transferReceived: 0,
+    cashReceived: 0,
+    waived: 0,
+    outstanding: 0,
+    pending: false,
+    overdue: false,
+    latestPaymentAt: null,
+  };
 }
 
 function periodKey(year: number, month: number) {
@@ -300,6 +343,11 @@ export function aggregateRtFinancialReport(
   }));
   const dueSummaries = new Map<string, ReportTotals>();
   const householdById = new Map<string, ReportHouseholdIdentity>();
+  const matrixByHouseholdId = new Map<string, {
+    identity: ReportHouseholdIdentity;
+    months: HouseholdMatrixCell[];
+    latestPaymentAt: string | null;
+  }>();
   const arrearsByHousehold = new Map<string, ArrearsHousehold & { householdId: string; rtUnitId: string }>();
   const yearlyFromMonths = emptyTotals();
   const yearlyFromDues = emptyTotals();
@@ -319,6 +367,40 @@ export function aggregateRtFinancialReport(
       throw new ReportInvariantError("Household display details changed within the report.");
     }
     householdById.set(due.household.householdId, due.household);
+
+    const matrixHousehold = matrixByHouseholdId.get(due.household.householdId) ?? {
+      identity: due.household,
+      months: Array.from({ length: 12 }, (_, index) => emptyHouseholdMatrixCell(index + 1)),
+      latestPaymentAt: null,
+    };
+    const priorCell = matrixHousehold.months[due.month - 1];
+    if (!priorCell || priorCell.status !== "no_data") {
+      throw new ReportInvariantError("A household period was included more than once.");
+    }
+    const latestPaymentAt = due.latestPaymentAt ?? null;
+    if (latestPaymentAt !== null && !validTimestamp(latestPaymentAt)) {
+      throw new ReportInvariantError("A verified payment timestamp is invalid.");
+    }
+    matrixHousehold.months[due.month - 1] = {
+      month: due.month,
+      dueDate: due.dueDate,
+      status: due.status,
+      target: summary.target,
+      effectiveTarget: summary.effectiveTarget,
+      received: summary.received,
+      openingBalanceReceived: summary.openingBalanceReceived,
+      transferReceived: summary.transferReceived,
+      cashReceived: summary.cashReceived,
+      waived: summary.waived,
+      outstanding: summary.outstanding,
+      pending: due.hasPendingRequest,
+      overdue: summary.overdueCount === 1,
+      latestPaymentAt,
+    };
+    if (latestPaymentAt && (!matrixHousehold.latestPaymentAt || latestPaymentAt > matrixHousehold.latestPaymentAt)) {
+      matrixHousehold.latestPaymentAt = latestPaymentAt;
+    }
+    matrixByHouseholdId.set(due.household.householdId, matrixHousehold);
 
     const month = monthly[due.month - 1];
     if (!month) throw new ReportInvariantError("A monthly bucket was not created.");
@@ -378,6 +460,18 @@ export function aggregateRtFinancialReport(
       };
     });
 
+  const householdMatrix: HouseholdMatrixRow[] = [...matrixByHouseholdId.values()]
+    .sort((left, right) =>
+      left.identity.houseNumber.localeCompare(right.identity.houseNumber, "id-ID", { numeric: true, sensitivity: "base" }) ||
+      left.identity.startsOn.localeCompare(right.identity.startsOn) ||
+      left.identity.householdId.localeCompare(right.identity.householdId))
+    .map((entry, index) => {
+      const { householdId, rtUnitId, ...identity } = entry.identity;
+      void householdId;
+      void rtUnitId;
+      return { key: index + 1, ...identity, months: entry.months, latestPaymentAt: entry.latestPaymentAt };
+    });
+
   const result: RtFinancialReportResponse = {
     year: input.year,
     availableYears: [...input.availableYears],
@@ -386,6 +480,7 @@ export function aggregateRtFinancialReport(
     futureUnpaidOutstanding,
     yearly: yearlyFromMonths,
     monthly,
+    householdMatrix,
     arrears: {
       totalOutstanding: arrearsTotalOutstanding,
       count: arrearsCount,
@@ -418,11 +513,15 @@ export function sumActiveAllocationMethods(
     }
     if (row.paymentReversed) continue;
 
+    const verifiedAt = row.verifiedAt instanceof Date ? row.verifiedAt.toISOString() : row.verifiedAt;
+    if (!validTimestamp(verifiedAt)) throw new ReportInvariantError("A verified payment timestamp is invalid.");
+
     const amount = safeDatabaseInteger(row.amount, "allocation amount");
     if (amount <= 0) throw new ReportInvariantError("An allocation has a non-positive amount.");
-    const dueTotals = totals.get(row.monthlyDueId) ?? { transferReceived: 0, cashReceived: 0 };
+    const dueTotals = totals.get(row.monthlyDueId) ?? { transferReceived: 0, cashReceived: 0, latestPaymentAt: null };
     const field = row.method === "transfer" ? "transferReceived" : "cashReceived";
     dueTotals[field] = add(dueTotals[field], amount, `${row.method} allocation total`);
+    if (!dueTotals.latestPaymentAt || verifiedAt > dueTotals.latestPaymentAt) dueTotals.latestPaymentAt = verifiedAt;
     totals.set(row.monthlyDueId, dueTotals);
   }
   return totals;
