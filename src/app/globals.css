@@ -1003,6 +1003,95 @@ button { color: inherit; }
 .chairman-report-household-total { min-width: 0; padding-top: 10px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); }
 .chairman-report-household-total span { color: var(--muted); font-size: 12px; line-height: 1.35; }
 .chairman-report-household-total strong { min-width: 0; font-size: 15px; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+
+.chairman-report-view-switch { min-width: 0; margin: 17px 0; padding: 4px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); }
+.chairman-report-view-switch button { min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid transparent; border-radius: 9px; color: var(--muted); background: transparent; font: inherit; font-weight: 750; cursor: pointer; transition: transform 170ms ease, color 170ms ease, border-color 170ms ease, background-color 170ms ease; }
+.chairman-report-view-switch button:hover { color: var(--ink); background: var(--surface); }
+.chairman-report-view-switch button:active { transform: scale(.97); }
+.chairman-report-view-switch button:focus-visible { outline: 3px solid color-mix(in srgb, var(--teal) 30%, transparent); outline-offset: 2px; }
+.chairman-report-view-switch button.is-active { border-color: var(--line); color: var(--ink); background: var(--surface); box-shadow: 0 2px 7px rgb(25 55 65 / 8%); }
+.chairman-report-view-panel { min-width: 0; }
+.household-matrix { min-width: 0; margin-top: 17px; }
+.household-matrix-heading { min-width: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.household-matrix-heading > div { min-width: 0; }
+.household-matrix-heading .eyebrow { margin: 0 0 5px; }
+.household-matrix-heading h2 { margin: 0; font-size: clamp(20px, 4.8vw, 25px); line-height: 1.25; overflow-wrap: anywhere; }
+.household-matrix-heading p:last-child { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.household-matrix-count { flex: 0 0 auto; padding: 5px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); font-size: 12px; font-weight: 750; }
+.household-matrix-controls { min-width: 0; margin: 15px 0 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.household-matrix-controls label { min-width: 0; display: grid; gap: 5px; color: var(--ink); font-size: 12px; font-weight: 750; }
+.household-matrix-controls input, .household-matrix-controls select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--ink); background: var(--surface); font: inherit; font-size: 14px; }
+.household-matrix-controls input:focus-visible, .household-matrix-controls select:focus-visible { outline: 3px solid color-mix(in srgb, var(--teal) 25%, transparent); outline-offset: 2px; border-color: var(--teal); }
+.household-matrix-direction { justify-self: start; min-width: 95px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--ink); background: var(--surface); font: inherit; font-size: 14px; font-weight: 750; cursor: pointer; transition: transform 170ms ease, border-color 170ms ease, background-color 170ms ease; }
+.household-matrix-direction:hover { border-color: var(--teal); background: var(--teal-wash); }
+.household-matrix-direction:active { transform: scale(.97); }
+.household-matrix-direction:focus-visible { outline: 3px solid color-mix(in srgb, var(--teal) 25%, transparent); outline-offset: 2px; }
+.household-matrix-legend { min-width: 0; margin: 12px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; list-style: none; }
+.household-matrix-legend li, .household-matrix-status { min-height: 27px; padding: 4px 8px; display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface-raised); font-size: 11px; font-weight: 750; line-height: 1.25; }
+.household-matrix-legend .is-paid, .household-matrix-status.is-paid { border-color: #a8d2bd; color: #175e45; background: #eaf6ef; }
+.dark .household-matrix-legend .is-paid, .dark .household-matrix-status.is-paid { border-color: #39735e; color: #b5e6d1; background: #20372f; }
+.household-matrix-legend .is-pending, .household-matrix-legend .is-unpaid, .household-matrix-status.is-pending, .household-matrix-status.is-unpaid { border-color: #ead79b; color: #735700; background: #fff9e3; }
+.dark .household-matrix-legend .is-pending, .dark .household-matrix-legend .is-unpaid, .dark .household-matrix-status.is-pending, .dark .household-matrix-status.is-unpaid { border-color: #78652e; color: #f2d778; background: #302b1b; }
+.household-matrix-legend .is-overdue, .household-matrix-status.is-overdue { border-color: #dfaaa3; color: #883c35; background: #fff0ed; }
+.dark .household-matrix-legend .is-overdue, .dark .household-matrix-status.is-overdue { border-color: #804941; color: #f4b5ad; background: #3a2928; }
+.household-matrix-legend .is-waived, .household-matrix-status.is-waived { border-color: #c8b0dd; color: #61447d; background: #f4edf9; }
+.dark .household-matrix-legend .is-waived, .dark .household-matrix-status.is-waived { border-color: #6f5682; color: #e0c7f2; background: #33283c; }
+.household-matrix-legend .is-upcoming, .household-matrix-legend .is-not-due, .household-matrix-legend .is-no_data, .household-matrix-status.is-upcoming, .household-matrix-status.is-not_due, .household-matrix-status.is-no_data { border-color: #aab7c0; color: #475762; background: #eef2f4; }
+.dark .household-matrix-legend .is-upcoming, .dark .household-matrix-legend .is-not-due, .dark .household-matrix-legend .is-no_data, .dark .household-matrix-status.is-upcoming, .dark .household-matrix-status.is-not_due, .dark .household-matrix-status.is-no_data { border-color: #50616c; color: #d4e0e4; background: #27353b; }
+.household-matrix-scroll-hint { margin: 8px 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.household-matrix-scroll { max-width: 100%; max-height: min(70vh, 760px); overflow: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); scrollbar-gutter: stable; }
+.household-matrix-scroll:focus-visible { outline: 3px solid color-mix(in srgb, var(--teal) 28%, transparent); outline-offset: 2px; }
+.household-matrix-table { width: 100%; min-width: 1260px; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.household-matrix-table th, .household-matrix-table td { padding: 5px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: center; }
+.household-matrix-table th { position: sticky; top: 0; z-index: 2; min-width: 84px; color: var(--muted); background: var(--surface-raised); font-size: 12px; font-weight: 800; }
+.household-matrix-table .household-matrix-house-column { position: sticky; left: 0; z-index: 3; width: 240px; min-width: 240px; max-width: 240px; text-align: left; background: var(--surface); }
+.household-matrix-table thead .household-matrix-house-column { z-index: 4; background: var(--surface-raised); }
+.household-matrix-table tbody th.household-matrix-house-column { padding: 10px; vertical-align: top; box-shadow: 3px 0 6px rgb(25 55 65 / 5%); }
+.household-matrix-house-column strong, .household-matrix-house-column span, .household-matrix-house-column small { display: block; overflow-wrap: anywhere; }
+.household-matrix-house-column strong { color: var(--ink); font-size: 13px; line-height: 1.35; }
+.household-matrix-house-column span { margin-top: 4px; color: var(--ink); font-size: 12px; font-weight: 500; line-height: 1.35; }
+.household-matrix-house-column small { margin-top: 5px; color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.35; }
+.household-matrix-table td { min-width: 84px; vertical-align: middle; }
+.household-matrix-cell { width: 100%; min-width: 74px; min-height: 54px; padding: 6px 5px; display: grid; align-content: center; justify-items: center; gap: 3px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); font: inherit; font-size: 10px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; cursor: pointer; transition: transform 170ms ease, border-color 170ms ease, background-color 170ms ease; }
+.household-matrix-cell small { color: inherit; font-size: 9px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.household-matrix-cell:active { transform: scale(.97); }
+.household-matrix-cell:focus-visible { outline: 3px solid color-mix(in srgb, var(--teal) 30%, transparent); outline-offset: 1px; }
+.household-matrix-cell.is-selected { outline: 2px solid var(--teal); outline-offset: 1px; }
+.household-matrix-cell.is-paid { border-color: #a8d2bd; color: #175e45; background: #eaf6ef; }
+.dark .household-matrix-cell.is-paid { border-color: #39735e; color: #b5e6d1; background: #20372f; }
+.household-matrix-cell.is-pending, .household-matrix-cell.is-unpaid { border-color: #ead79b; color: #735700; background: #fff9e3; }
+.dark .household-matrix-cell.is-pending, .dark .household-matrix-cell.is-unpaid { border-color: #78652e; color: #f2d778; background: #302b1b; }
+.household-matrix-cell.is-overdue { border-color: #dfaaa3; color: #883c35; background: #fff0ed; }
+.dark .household-matrix-cell.is-overdue { border-color: #804941; color: #f4b5ad; background: #3a2928; }
+.household-matrix-cell.is-waived { border-color: #c8b0dd; color: #61447d; background: #f4edf9; }
+.dark .household-matrix-cell.is-waived { border-color: #6f5682; color: #e0c7f2; background: #33283c; }
+.household-matrix-cell.is-upcoming, .household-matrix-cell.is-not_due, .household-matrix-cell.is-no_data { border-color: #aab7c0; color: #475762; background: #eef2f4; }
+.dark .household-matrix-cell.is-upcoming, .dark .household-matrix-cell.is-not_due, .dark .household-matrix-cell.is-no_data { border-color: #50616c; color: #d4e0e4; background: #27353b; }
+.household-matrix-cell-note { font-size: 9px; }
+.household-matrix-detail { min-width: 0; margin-top: 14px; padding: clamp(14px, 4vw, 20px); display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--teal-wash); }
+.household-matrix-detail-heading { min-width: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 9px; }
+.household-matrix-detail-heading > div { min-width: 0; }
+.household-matrix-detail-heading .eyebrow { margin: 0 0 5px; }
+.household-matrix-detail-heading h3 { margin: 0; font-size: 18px; line-height: 1.3; overflow-wrap: anywhere; }
+.household-matrix-detail-heading p:last-child { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.household-matrix-status { flex: 0 0 auto; max-width: 48%; overflow-wrap: anywhere; }
+.household-matrix-detail-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.household-matrix-detail-metrics { min-width: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.household-matrix-detail-metrics > div { min-width: 0; padding: 9px; display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.household-matrix-detail-metrics dt { color: var(--muted); font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
+.household-matrix-detail-metrics dd { min-width: 0; margin: 0; color: var(--ink); font-size: 13px; font-weight: 800; line-height: 1.35; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+@media (min-width: 760px) {
+  .household-matrix-controls { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; }
+  .household-matrix-direction { justify-self: stretch; }
+  .household-matrix-detail-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) {
+  .household-matrix-heading { align-items: flex-start; flex-direction: column; }
+  .household-matrix-count { align-self: flex-start; }
+  .household-matrix-table .household-matrix-house-column { width: 210px; min-width: 210px; max-width: 210px; }
+  .household-matrix-table th, .household-matrix-table td { min-width: 78px; }
+}
+
 @media (min-width: 600px) {
   .chairman-report-year-panel { max-width: 380px; padding: 16px; }
   .chairman-report-month-card, .chairman-report-household-card { padding: 16px; }

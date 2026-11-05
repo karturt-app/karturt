@@ -1,9 +1,11 @@
 "use client";
 
 import { MonthlyReportPrint } from "@/components/monthly-report-print";
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { HouseholdDuesMatrix } from "@/components/household-dues-matrix";
+import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, CalendarDays, ChartPie, RotateCcw } from "lucide-react";
+import type { HouseholdMatrixCell, HouseholdMatrixRow } from "@/lib/reports/aggregation";
 import type { RtFinancialReportResponse } from "@/lib/reports/rt-financial-report";
 
 type ReportAmounts = RtFinancialReportResponse["yearly"];
@@ -13,6 +15,30 @@ const monthNames = [
   "Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
+
+const REPORT_VIEW_STORAGE_KEY = "karturt:laporan:view:v1";
+const REPORT_VIEW_EVENT = "karturt:laporan:view:change";
+type ReportView = "laporan" | "matriks";
+let inMemoryReportView: ReportView = "laporan";
+
+function getStoredReportView(): ReportView {
+  try {
+    const savedView = window.localStorage.getItem(REPORT_VIEW_STORAGE_KEY);
+    if (savedView === "matriks" || savedView === "laporan") return savedView;
+  } catch {
+    return inMemoryReportView;
+  }
+  return inMemoryReportView;
+}
+
+function subscribeToReportView(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(REPORT_VIEW_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(REPORT_VIEW_EVENT, onChange);
+  };
+}
 
 const currencyFormat = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -32,6 +58,12 @@ function isCanonicalDate(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = Date.parse(`${value}T00:00:00.000Z`);
   return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === value;
+}
+
+function isCanonicalTimestamp(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
 }
 
 function dateLabel(value: string) {
@@ -81,6 +113,134 @@ function isReportAmounts(value: unknown): value is ReportAmounts {
     obligationTotal === candidate.effectiveTarget;
 }
 
+const matrixAmountFields = [
+  "target",
+  "effectiveTarget",
+  "received",
+  "openingBalanceReceived",
+  "transferReceived",
+  "cashReceived",
+  "waived",
+  "outstanding",
+] as const;
+
+function isHouseholdMatrixCell(value: unknown, expectedMonth: number, year: number, businessDate: string): value is HouseholdMatrixCell {
+  if (!value || typeof value !== "object") return false;
+  const cell = value as Partial<HouseholdMatrixCell>;
+  if (
+    cell.month !== expectedMonth ||
+    !["unpaid", "paid", "waived", "not_due", "no_data"].includes(cell.status ?? "") ||
+    !(cell.dueDate === null || isCanonicalDate(cell.dueDate)) ||
+    !matrixAmountFields.every((field) => isSafeCount(cell[field])) ||
+    typeof cell.pending !== "boolean" ||
+    typeof cell.overdue !== "boolean" ||
+    !(cell.latestPaymentAt === null || isCanonicalTimestamp(cell.latestPaymentAt))
+  ) return false;
+
+  const validCell = cell as HouseholdMatrixCell;
+  const total = validCell.openingBalanceReceived + validCell.received + validCell.waived + validCell.outstanding;
+  if (!Number.isSafeInteger(total) || total !== validCell.effectiveTarget) return false;
+
+  if (validCell.status === "no_data") {
+    return validCell.dueDate === null && !validCell.pending && !validCell.overdue && validCell.latestPaymentAt === null &&
+      matrixAmountFields.every((field) => validCell[field] === 0);
+  }
+
+  if (
+    !validCell.dueDate ||
+    validCell.dueDate.slice(0, 4) !== String(year) ||
+    Number(validCell.dueDate.slice(5, 7)) !== expectedMonth ||
+    validCell.dueDate.slice(8, 10) !== "10" ||
+    validCell.overdue !== (validCell.outstanding > 0 && validCell.dueDate < businessDate)
+  ) return false;
+
+  if (validCell.status === "not_due") {
+    return !validCell.pending && validCell.latestPaymentAt === null && matrixAmountFields.every((field) => validCell[field] === 0);
+  }
+  if (validCell.status === "waived") {
+    return validCell.target > 0 && validCell.waived === validCell.effectiveTarget && validCell.waived > 0 &&
+      validCell.received === 0 && validCell.openingBalanceReceived === 0 && validCell.outstanding === 0;
+  }
+  if (validCell.status === "paid") {
+    return validCell.target > 0 && validCell.outstanding === 0 && validCell.waived === 0 &&
+      validCell.received + validCell.openingBalanceReceived > 0;
+  }
+  return validCell.status === "unpaid" && validCell.target > 0 && validCell.outstanding > 0 && validCell.waived === 0;
+}
+
+function isHouseholdMatrixRow(value: unknown, year: number, businessDate: string): value is HouseholdMatrixRow {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Partial<HouseholdMatrixRow>;
+  if (
+    "householdId" in row || "rtUnitId" in row ||
+    !isSafeCount(row.key) || row.key < 1 ||
+    typeof row.houseNumber !== "string" || !row.houseNumber.trim() ||
+    !(typeof row.houseLabel === "string" || row.houseLabel === null) ||
+    !Array.isArray(row.residentNames) || !row.residentNames.every((name) => typeof name === "string") ||
+    (row.lifecycle !== "active" && row.lifecycle !== "historical") ||
+    !isCanonicalDate(row.startsOn) ||
+    !(row.endsOn === null || isCanonicalDate(row.endsOn)) ||
+    (row.lifecycle === "active" && row.endsOn !== null) ||
+    (row.lifecycle === "historical" && row.endsOn === null) ||
+    !Array.isArray(row.months) || row.months.length !== 12 ||
+    !row.months.every((cell, index) => isHouseholdMatrixCell(cell, index + 1, year, businessDate)) ||
+    !(row.latestPaymentAt === null || isCanonicalTimestamp(row.latestPaymentAt))
+  ) return false;
+
+  const latestCellPayment = row.months.reduce<string | null>((latest, cell) => {
+    if (!cell.latestPaymentAt) return latest;
+    return !latest || cell.latestPaymentAt > latest ? cell.latestPaymentAt : latest;
+  }, null);
+  return row.latestPaymentAt === latestCellPayment;
+}
+
+function isHouseholdMatrix(
+  value: unknown,
+  year: number,
+  businessDate: string,
+  monthly: RtFinancialReportResponse["monthly"],
+): value is HouseholdMatrixRow[] {
+  if (!Array.isArray(value) || !value.every((row) => isHouseholdMatrixRow(row, year, businessDate))) return false;
+
+  const totals = monthly.map(() => ({
+    target: 0,
+    effectiveTarget: 0,
+    received: 0,
+    openingBalanceReceived: 0,
+    transferReceived: 0,
+    cashReceived: 0,
+    waived: 0,
+    outstanding: 0,
+    obligationCount: 0,
+    waivedCount: 0,
+    notDueCount: 0,
+    overdueCount: 0,
+  }));
+  for (const row of value as HouseholdMatrixRow[]) {
+    for (const cell of row.months) {
+      const total = totals[cell.month - 1];
+      if (!total) return false;
+      for (const field of matrixAmountFields) {
+        total[field] += cell[field];
+        if (!Number.isSafeInteger(total[field])) return false;
+      }
+      if (cell.status === "unpaid" || cell.status === "paid" || cell.status === "waived") total.obligationCount += 1;
+      if (cell.status === "waived") total.waivedCount += 1;
+      if (cell.status === "not_due") total.notDueCount += 1;
+      if (cell.overdue) total.overdueCount += 1;
+    }
+  }
+  return monthly.every((month, index) => {
+    const total = totals[index];
+    return total !== undefined &&
+      matrixAmountFields.every((field) => total[field] === month[field]) &&
+      total.obligationCount === month.obligationCount &&
+      total.waivedCount === month.waivedCount &&
+      total.notDueCount === month.notDueCount &&
+      total.overdueCount === month.overdueCount;
+  });
+}
+
 function isChairmanReport(value: unknown, expectedYear: number): value is ChairmanReport {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<ChairmanReport>;
@@ -102,6 +262,9 @@ function isChairmanReport(value: unknown, expectedYear: number): value is Chairm
       isReportAmounts(month)
     )
   ) {
+    return false;
+  }
+  if (!isHouseholdMatrix(candidate.householdMatrix, expectedYear, candidate.asOf.businessDate, candidate.monthly)) {
     return false;
   }
   const asOfPeriod = candidate.asOf.period;
@@ -292,7 +455,22 @@ export function ChairmanReports({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryToken, setRetryToken] = useState(0);
+  const activeView = useSyncExternalStore(
+    subscribeToReportView,
+    getStoredReportView,
+    () => "laporan",
+  );
   const autoSelectRef = useRef(autoSelectAvailableYear);
+
+  function changeView(nextView: ReportView) {
+    inMemoryReportView = nextView;
+    try {
+      window.localStorage.setItem(REPORT_VIEW_STORAGE_KEY, nextView);
+    } catch {
+      // Keep this preference optional when browser storage is unavailable.
+    }
+    window.dispatchEvent(new Event(REPORT_VIEW_EVENT));
+  }
 
   useEffect(() => {
     if (autoSelectAvailableYear) {
@@ -381,7 +559,7 @@ export function ChairmanReports({
       <div className="chairman-reports-heading">
         <p className="eyebrow">LAPORAN IURAN</p>
         <h1 id="chairman-reports-title">Laporan iuran</h1>
-        <p>{treasurerMode ? "Pilih bagian laporan yang ingin dilihat." : "Ringkasan pemasukan dan kewajiban berdasarkan bulan tagihan."}</p>
+        <p>{treasurerMode ? "Pilih tampilan laporan atau matriks tahunan." : "Pilih tampilan ringkasan atau matriks iuran tahunan."}</p>
       </div>
 
       <div className="chairman-report-year-panel">
@@ -411,6 +589,26 @@ export function ChairmanReports({
 
       {data && !loading && !error && (
         <>
+          <div className="chairman-report-view-switch" role="group" aria-label="Tampilan laporan iuran">
+            <button
+              type="button"
+              className={activeView === "laporan" ? "is-active" : ""}
+              aria-pressed={activeView === "laporan"}
+              onClick={() => changeView("laporan")}
+            >
+              Laporan
+            </button>
+            <button
+              type="button"
+              className={activeView === "matriks" ? "is-active" : ""}
+              aria-pressed={activeView === "matriks"}
+              onClick={() => changeView("matriks")}
+            >
+              Matriks
+            </button>
+          </div>
+
+          <div className="chairman-report-view-panel" hidden={activeView !== "laporan"}>
           <MonthlyReportPrint treasurerMode={treasurerMode} report={data} rtIdentity={rtIdentity} month={selectedMonth} onMonthChange={(month) => {
             setSelectedMonth(month);
             router.replace(`/app/laporan?year=${selectedYear}&month=${month}`, { scroll: false });
@@ -596,6 +794,11 @@ export function ChairmanReports({
             )}
           </section>
           </ReportDisclosure>
+          </div>
+
+          <div className="chairman-report-view-panel" hidden={activeView !== "matriks"}>
+            <HouseholdDuesMatrix report={data} />
+          </div>
         </>
       )}
     </section>

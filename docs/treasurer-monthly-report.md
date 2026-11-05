@@ -4,6 +4,10 @@ Ketua RT dan Bendahara aktif dapat membuka `/app/laporan` untuk RT tempat mereka
 
 Pilih tahun dan bulan, lalu gunakan **Cetak / Simpan PDF**. Pilihan periode tercatat pada URL sehingga tetap tersedia setelah refresh. Cetakan A4 memuat identitas RT dari database, periode, posisi data, waktu cetak WIB, ringkasan, serta tunggakan periode terpilih. Header aplikasi, kontrol, laporan tahunan, dan footer tidak ikut dicetak. Daftar panjang dapat berlanjut ke halaman berikutnya.
 
+Pilihan **Laporan / Matriks** memakai data tahun yang sama. Matriks menampilkan Januari–Desember dengan satu baris per masa rumah tangga pada tagihan tahun tersebut; penghuni lama dan baru di nomor rumah yang sama tetap terpisah. Cari dengan nomor rumah atau nama warga, lalu filter semua rumah, tunggakan, pengajuan menunggu verifikasi, rumah yang pernah lunas, atau kewajiban yang belum dibayar. Urutan tersedia menurut nomor rumah, nama, nilai tunggakan, jumlah bulan lunas, atau waktu pembayaran terverifikasi terbaru, dengan arah naik/turun. Pilih satu bulan untuk rincian baca-saja.
+
+Pembayaran yang masih menunggu verifikasi tidak dihitung sebagai penerimaan. Pembayaran yang dibalik tidak dihitung sebagai pembayaran aktif maupun tanggal pembayaran terbaru. Kewajiban mendatang berlabel belum jatuh tempo; periode tanpa kewajiban dan tanpa baris tagihan tidak diberi nilai tagihan atau pembayaran. Tahun tanpa data tagihan menampilkan matriks kosong.
+
 ## Arti angka
 
 Tombol **Unduh CSV** mengunduh ringkasan dan rincian tunggakan untuk bulan/tahun yang dipilih, memakai data laporan yang sudah dimuat dan diotorisasi. CSV menggunakan UTF-8 dengan BOM, pemisah titik koma, dan nominal rupiah berupa angka utuh agar dapat diolah di Excel. Jika Excel tidak memisahkan kolom otomatis, gunakan menu impor CSV dengan delimiter titik koma. Teks yang berpotensi menjadi formula dinetralkan; tanda kutip, delimiter, dan baris baru di dalam nama ditangani sebagai isi sel. Berkas unduhan memuat data warga dan harus disimpan/dibagikan hanya kepada pihak yang berwenang.

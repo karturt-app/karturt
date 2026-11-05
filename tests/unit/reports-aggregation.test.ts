@@ -46,6 +46,7 @@ function due(
     cashReceived: 0,
     waiverAmount: 0,
     hasPendingRequest: false,
+    latestPaymentAt: null,
     ...input,
   };
 }
@@ -154,6 +155,66 @@ describe("F13 report aggregation", () => {
     expect(result.monthly.slice(5).every((month) => month.outstanding === 120_000 && month.notDueCount === 1)).toBe(true);
   });
 
+  it("builds one twelve-month row per household identity and leaves missing periods without invented amounts", () => {
+    const h1 = household({ householdId: "matrix-h1", houseNumber: "A-01", residentNames: ["Resident One"] });
+    const oldStay = household({
+      householdId: "matrix-old",
+      houseNumber: "A-03",
+      lifecycle: "historical",
+      startsOn: "2024-01-01",
+      endsOn: "2026-02-28",
+    });
+    const newStay = household({ householdId: "matrix-new", houseNumber: "A-03", startsOn: "2026-03-01" });
+    const report = aggregateRtFinancialReport([
+      due(h1, 1, { status: "paid", activeReceived: 40_000, transferReceived: 40_000, latestPaymentAt: "2026-01-12T02:30:00.000Z" }),
+      due(h1, 3, { hasPendingRequest: true }),
+      due(h1, 4, { status: "waived", waiverAmount: 40_000 }),
+      due(h1, 6),
+      due(oldStay, 1, { status: "not_due" }),
+      due(newStay, 1, { status: "paid", activeReceived: 40_000, cashReceived: 40_000 }),
+    ], { year: YEAR, availableYears: [YEAR], businessDate: BUSINESS_DATE });
+
+    expect(report.householdMatrix).toHaveLength(3);
+    expect(report.householdMatrix.map((row) => row.houseNumber)).toEqual(["A-01", "A-03", "A-03"]);
+    expect(report.householdMatrix.every((row) => !("householdId" in row) && !("rtUnitId" in row))).toBe(true);
+    const current = report.householdMatrix.find((row) => row.residentNames.includes("Resident One"));
+    expect(current?.months).toHaveLength(12);
+    expect(current?.months.map((month) => month.status)).toEqual([
+      "paid", "no_data", "unpaid", "waived", "no_data", "unpaid",
+      "no_data", "no_data", "no_data", "no_data", "no_data", "no_data",
+    ]);
+    expect(current?.months[0]).toMatchObject({ received: 40_000, latestPaymentAt: "2026-01-12T02:30:00.000Z", overdue: false });
+    expect(current?.months[2]).toMatchObject({ pending: true, overdue: true, outstanding: 40_000 });
+    expect(current?.months[5]).toMatchObject({ dueDate: "2026-06-10", status: "unpaid", overdue: false, outstanding: 40_000 });
+    expect(current?.months[1]).toMatchObject({ dueDate: null, status: "no_data", target: 0, outstanding: 0 });
+    expect(report.householdMatrix.filter((row) => row.houseNumber === "A-03").map((row) => row.lifecycle)).toEqual(["historical", "active"]);
+  });
+
+  it("returns an empty matrix for a future year with no billing year instead of borrowing other-year amounts", () => {
+    const report = aggregateRtFinancialReport([], {
+      year: 2027,
+      availableYears: [YEAR],
+      businessDate: "2026-11-05",
+    });
+
+    expect(report.year).toBe(2027);
+    expect(report.householdMatrix).toEqual([]);
+    expect(report.yearly).toMatchObject({ target: 0, effectiveTarget: 0, received: 0, outstanding: 0 });
+    expect(report.monthly).toHaveLength(12);
+    expect(report.monthly.every((month) => month.target === 0 && month.received === 0 && month.outstanding === 0)).toBe(true);
+  });
+
+  it("fails closed when a household has duplicate obligations in one month", () => {
+    const identity = household({ householdId: "duplicate-month", houseNumber: "A-11" });
+    const first = due(identity, 2);
+    const second = { ...first, monthlyDueId: "duplicate-month-2" };
+    expect(() => aggregateRtFinancialReport([first, second], {
+      year: YEAR,
+      availableYears: [YEAR],
+      businessDate: BUSINESS_DATE,
+    })).toThrow(ReportInvariantError);
+  });
+
   it("uses the strict Jakarta due-date cutoff and keeps a pending request out of received", () => {
     const identity = household({ householdId: "pending", houseNumber: "A-04" });
     const pendingDue = due(identity, 5, { hasPendingRequest: true });
@@ -251,13 +312,17 @@ describe("F13 report aggregation", () => {
   it("sums multiple active allocation methods and excludes reversed allocations", () => {
     const identity = household({ householdId: "mixed", houseNumber: "A-05" });
     const methodTotals = sumActiveAllocationMethods([
-      { monthlyDueId: "mixed-1", householdId: "mixed", rtUnitId: "rt-1", method: "transfer", amount: "15000", paymentReversed: false },
-      { monthlyDueId: "mixed-1", householdId: "mixed", rtUnitId: "rt-1", method: "transfer", amount: "25000", paymentReversed: false },
-      { monthlyDueId: "mixed-1", householdId: "mixed", rtUnitId: "rt-1", method: "cash", amount: "10000", paymentReversed: false },
-      { monthlyDueId: "mixed-1", householdId: "mixed", rtUnitId: "rt-1", method: "cash", amount: "40000", paymentReversed: true },
+      { monthlyDueId: "mixed-1", householdId: "mixed", rtUnitId: "rt-1", method: "transfer", amount: "15000", paymentReversed: false, verifiedAt: "2026-01-12T10:00:00.000Z" },
+      { monthlyDueId: "mixed-1", householdId: "mixed", rtUnitId: "rt-1", method: "transfer", amount: "25000", paymentReversed: false, verifiedAt: "2026-01-20T10:00:00.000Z" },
+      { monthlyDueId: "mixed-1", householdId: "mixed", rtUnitId: "rt-1", method: "cash", amount: "10000", paymentReversed: false, verifiedAt: "2026-01-25T10:00:00.000Z" },
+      { monthlyDueId: "mixed-1", householdId: "mixed", rtUnitId: "rt-1", method: "cash", amount: "40000", paymentReversed: true, verifiedAt: "2026-01-30T10:00:00.000Z" },
     ], [{ monthlyDueId: "mixed-1", household: identity }]);
 
-    expect(methodTotals.get("mixed-1")).toEqual({ transferReceived: 40_000, cashReceived: 10_000 });
+    expect(methodTotals.get("mixed-1")).toEqual({
+      transferReceived: 40_000,
+      cashReceived: 10_000,
+      latestPaymentAt: "2026-01-25T10:00:00.000Z",
+    });
     const report = aggregateRtFinancialReport([
       due(identity, 1, { originalAmount: 100_000, activeReceived: 50_000, transferReceived: 40_000, cashReceived: 10_000 }),
     ], { year: YEAR, availableYears: [YEAR], businessDate: BUSINESS_DATE });
@@ -310,10 +375,10 @@ describe("F13 report aggregation", () => {
   it("fails closed when allocation scope or amounts are invalid", () => {
     const identity = household({ householdId: "alloc", houseNumber: "A-07" });
     expect(() => sumActiveAllocationMethods([
-      { monthlyDueId: "alloc-1", householdId: "other", rtUnitId: "rt-1", method: "cash", amount: 10, paymentReversed: false },
+      { monthlyDueId: "alloc-1", householdId: "other", rtUnitId: "rt-1", method: "cash", amount: 10, paymentReversed: false, verifiedAt: "2026-01-12T10:00:00.000Z" },
     ], [{ monthlyDueId: "alloc-1", household: identity }])).toThrow(ReportInvariantError);
     expect(() => sumActiveAllocationMethods([
-      { monthlyDueId: "alloc-1", householdId: "alloc", rtUnitId: "rt-1", method: "cash", amount: Number.MAX_SAFE_INTEGER + 1, paymentReversed: false },
+      { monthlyDueId: "alloc-1", householdId: "alloc", rtUnitId: "rt-1", method: "cash", amount: Number.MAX_SAFE_INTEGER + 1, paymentReversed: false, verifiedAt: "2026-01-12T10:00:00.000Z" },
     ], [{ monthlyDueId: "alloc-1", household: identity }])).toThrow(ReportInvariantError);
   });
 });

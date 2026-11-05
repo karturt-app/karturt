@@ -18,6 +18,7 @@ import {
 } from "@/db/schema";
 import type { Principal } from "@/lib/auth/permissions";
 import { resolvePrincipalForUser } from "@/lib/auth/principal";
+import { recordTreasurerCashPayment } from "@/lib/billing/treasurer-cash-payments";
 import {
   getRtFinancialReport,
   ReportForbiddenError,
@@ -61,10 +62,29 @@ describe("Chairman RT report service authorization", () => {
     return {
       rtUnitId,
       householdId: household.householdId,
+      personId: household.personId,
       accountId: account!.id,
       assignmentId: assignment!.id,
       principal,
     };
+  }
+
+  async function createTreasurerFor(rtUnitId: string, personId: string) {
+    const user = await createAuthUser(testDatabase.db, `Reports cash Treasurer ${randomUUID().slice(0, 8)}`);
+    const [account] = await testDatabase.db.insert(appAccounts).values({
+      rtUnitId,
+      authUserId: user.id,
+      accountType: "official",
+      loginIdentifier: `reports-cash-treasurer-${randomUUID()}`,
+      personId,
+    }).returning({ id: appAccounts.id });
+    await testDatabase.db.insert(officialAssignments).values({
+      rtUnitId,
+      appAccountId: account!.id,
+      role: "treasurer",
+      startsOn: "2020-01-01",
+    });
+    return resolvePrincipalForUser(database, user.id, businessDate);
   }
 
   async function createResident() {
@@ -120,6 +140,18 @@ describe("Chairman RT report service authorization", () => {
       dueDate: "2026-01-10",
       status: "unpaid",
     });
+    const paymentRecorder = role === "treasurer"
+      ? fixture.principal
+      : await createTreasurerFor(fixture.rtUnitId, fixture.personId);
+    const idempotencyKey = randomUUID();
+    await recordTreasurerCashPayment(database, paymentRecorder, {
+      householdId: fixture.householdId,
+      period: "2026-01",
+      idempotencyKey,
+    }, businessDate);
+    const [recordedPayment] = await testDatabase.db.select({ verifiedAt: payments.verifiedAt })
+      .from(payments).where(eq(payments.cashIdempotencyKey, idempotencyKey));
+    if (!recordedPayment) throw new Error("The cash payment fixture was not persisted.");
     const before = await ledgerSnapshot();
 
     const report = await getRtFinancialReport(database, fixture.principal, {
@@ -129,6 +161,17 @@ describe("Chairman RT report service authorization", () => {
 
     const after = await ledgerSnapshot();
     expect(report.year).toBe(2026);
+    expect(report.householdMatrix).toHaveLength(1);
+    expect(report.householdMatrix[0]?.months[0]).toMatchObject({
+      month: 1,
+      status: "paid",
+      target: 40_000,
+      received: 40_000,
+      cashReceived: 40_000,
+      outstanding: 0,
+      overdue: false,
+      latestPaymentAt: recordedPayment.verifiedAt.toISOString(),
+    });
     expect(after).toEqual(before);
   });
 
@@ -183,14 +226,59 @@ describe("Chairman RT report service authorization", () => {
       .rejects.toBeInstanceOf(ReportForbiddenError);
   });
 
-  it.each(["rt_chairman", "treasurer"] as const)("does not disclose another RT's available billing years to %s", async (role) => {
+  it.each(["rt_chairman", "treasurer"] as const)("only includes %s's RT households when another RT has the same report year", async (role) => {
     const fixture = await createOfficial(role);
     const otherRt = await createRt(testDatabase.db);
-    await testDatabase.db.insert(billingYears).values({ rtUnitId: otherRt, year: 2026, status: "open" });
+    const [ownYear] = await testDatabase.db.insert(billingYears).values({
+      rtUnitId: fixture.rtUnitId,
+      year: 2026,
+      status: "open",
+    }).returning({ id: billingYears.id });
+    const [ownRate] = await createFeeRateFixture(testDatabase.db, {
+      rtUnitId: fixture.rtUnitId,
+      billingYearId: ownYear!.id,
+      effectiveMonth: 1,
+      monthlyAmount: 40000,
+    });
+    await testDatabase.db.insert(monthlyDues).values({
+      rtUnitId: fixture.rtUnitId,
+      householdId: fixture.householdId,
+      billingYearId: ownYear!.id,
+      feeRateId: ownRate!.id,
+      month: 1,
+      amount: 40000,
+      dueDate: "2026-01-10",
+      status: "unpaid",
+    });
+
+    const otherHousehold = await createHousehold(testDatabase.db, otherRt);
+    const [otherYear] = await testDatabase.db.insert(billingYears).values({
+      rtUnitId: otherRt,
+      year: 2026,
+      status: "open",
+    }).returning({ id: billingYears.id });
+    const [otherRate] = await createFeeRateFixture(testDatabase.db, {
+      rtUnitId: otherRt,
+      billingYearId: otherYear!.id,
+      effectiveMonth: 1,
+      monthlyAmount: 40000,
+    });
+    await testDatabase.db.insert(monthlyDues).values({
+      rtUnitId: otherRt,
+      householdId: otherHousehold.householdId,
+      billingYearId: otherYear!.id,
+      feeRateId: otherRate!.id,
+      month: 1,
+      amount: 40000,
+      dueDate: "2026-01-10",
+      status: "unpaid",
+    });
 
     const report = await getRtFinancialReport(database, fixture.principal, { year: 2026, businessDate });
 
-    expect(report.availableYears).toEqual([]);
+    expect(report.availableYears).toEqual([2026]);
+    expect(report.householdMatrix).toHaveLength(1);
+    expect(report.householdMatrix[0]?.months[0]).toMatchObject({ target: 40000, outstanding: 40000 });
     expect(report.year).toBe(2026);
   });
 });
