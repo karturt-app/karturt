@@ -36,7 +36,10 @@ async function main() {
   if (environment.appEnv !== "preview" || environment.databaseEnv !== "preview") {
     throw new Error("This command is restricted to an isolated Preview environment.");
   }
-  assertPreviewConnectionTarget(environment.databaseUrl, "runtime", process.env);
+  const target = assertPreviewConnectionTarget(environment.databaseUrl, "runtime", process.env);
+  if (target.projectId !== "quiet-credit-75135059") {
+    throw new Error("This checker is bound to the verified isolated synthetic UAT project.");
+  }
 
   const db = getDb();
   const [accounts, assignments, householdRows, personRows, rtRows, dueRows] = await Promise.all([
