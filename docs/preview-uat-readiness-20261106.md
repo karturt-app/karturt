@@ -15,24 +15,25 @@
 | Pemeriksaan | Hasil |
 | --- | --- |
 | RT / rumah / household aktif | 1 / 1 / 1 |
-| Akun resident | 1 aktif; hash PIN dan credential ada; tidak terkunci |
+| Akun resident | 1 aktif; hash PIN dan credential cocok; **masa tinggal baru mulai 2027-01-01**, sehingga belum boleh login pada 2026-11-06 |
 | Akun Ketua RT & Bendahara | 2 aktif; credential hash ada; **keduanya belum memiliki `pin_hash`** |
 | Penugasan pengurus aktif | 2 |
 | Akun System Admin | 1 aktif; credential hash ada; **TOTP belum terverifikasi** |
-| Tahun tagihan terbuka / tarif | 1 / 1 |
+| Tahun tagihan terbuka / tarif | 1 / 1 (tahun fixture **2027**) |
 | Tagihan bulanan | 12 (semua unpaid) |
 | Pengajuan pembayaran / pembayaran / reversal | 0 / 0 / 0 |
 | Waiver / penyesuaian | 0 / 0 |
 | Catatan migrasi Drizzle | 16 |
 
-**Konsekuensi:** login pengurus melalui username + PIN tidak bisa berhasil tanpa PIN; akun System Admin tidak bisa mendapat principal yang dilindungi sebelum TOTP terverifikasi. Login Warga baru memenuhi prasyarat database, belum teruji lewat aplikasi. Tidak ada alasan menghapus/reseed fixture atau menyalin data Production.
+**Konsekuensi:** keempat peran saat ini **belum siap untuk UAT login penuh**. Login pengurus tidak bisa berhasil tanpa PIN; System Admin tidak bisa mendapat principal terlindungi sebelum TOTP terverifikasi; dan Warga ditolak karena masa huni sintetis belum dimulai pada tanggal sekarang (2026-11-06). Ini bukan bukti kegagalan kode login. Jangan menghapus/reseed fixture kanonis atau menyalin data Production.
 
 ## Perbaikan aman (non-Production)
 
-1. **Ketua RT sintetis:** gunakan alur `/login/pengurus` → pemulihan PIN memakai password kuat akun sintetis yang sudah dimiliki operator. Tetapkan PIN enam digit **unik** dan simpan di password manager. Alur server yang ada memvalidasi password, menulis audit, dan mencabut sesi lama. Ulangi untuk **Bendahara sintetis** dengan PIN berbeda. Jangan mengubah akun Production dan jangan menyimpan PIN/password di GitHub atau chat.
-2. **System Admin sintetis:** masuk melalui `/system/login` dengan password sintetis, lalu selesaikan aktivasi dan verifikasi TOTP melalui alur aplikasi; simpan recovery codes secara aman. Jangan menandai verified langsung lewat SQL atau mengatur faktor tanpa verifikasi nyata.
-3. Setelah setup kredensial, jalankan pemeriksaan baca-saja dengan `npx tsx scripts/check-preview-synthetic-readiness.ts` dari checkout bersih dan `.env.local` **khusus Preview**. Skrip menolak target non-Preview dan tidak mencetak identifier, hash, PIN, password, TOTP, atau connection string. Hasil `READY_FOR_BROWSER_UAT` berarti prasyarat tersedia, **bukan** login telah berhasil.
-4. Lakukan login browser nyata dengan tiap akun pada deployment Preview yang berasal dari **SHA PR yang diuji**, di browser/profil terpisah setelah melewati SSO Vercel. Jangan melakukan tes pada domain Production.
+1. **Periode warga sintetis:** jangan mengubah tanggal mulai 2027, status ledger, atau melakukan override tanggal langsung di database kanonis. Untuk menguji login Warga pada tanggal 2026, siapkan **fixture UAT disposable tersendiri** dengan tanggal masa tinggal berjalan, atau gunakan override tanggal uji R3 **hanya** apabila identitas target, guard dan persetujuan khusus telah diverifikasi; guard R3 yang tercatat dalam kode masih terikat target berbeda. Mekanisme ini belum dijalankan.
+2. **Ketua RT sintetis:** gunakan alur `/login/pengurus` → pemulihan PIN memakai password kuat akun sintetis yang sudah dimiliki operator. Tetapkan PIN enam digit **unik** dan simpan di password manager. Alur server yang ada memvalidasi password, menulis audit, dan mencabut sesi lama. Ulangi untuk **Bendahara sintetis** dengan PIN berbeda. Jangan mengubah akun Production dan jangan menyimpan PIN/password di GitHub atau chat.
+3. **System Admin sintetis:** masuk melalui `/system/login` dengan password sintetis, lalu selesaikan aktivasi dan verifikasi TOTP melalui alur aplikasi; simpan recovery codes secara aman. Jangan menandai verified langsung lewat SQL atau mengatur faktor tanpa verifikasi nyata.
+4. Setelah setup kredensial, jalankan pemeriksaan baca-saja dengan `npx tsx scripts/check-preview-synthetic-readiness.ts` dari checkout bersih dan `.env.local` **khusus Preview**. Skrip menolak target non-Preview dan tidak mencetak identifier, hash, PIN, password, TOTP, atau connection string. Hasil `READY_FOR_BROWSER_UAT` berarti prasyarat tersedia, **bukan** login telah berhasil.
+5. Lakukan login browser nyata dengan tiap akun pada deployment Preview yang berasal dari **SHA PR yang diuji**, di browser/profil terpisah setelah melewati SSO Vercel. Jangan melakukan tes pada domain Production.
 
 Skrip baca-saja mendeteksi blocker, **tidak** mengubah password, PIN, factor, sesi, data transaksi, atau database. Aktivasi kredensial tetap memerlukan password yang benar dan alur yang sah; jangan melewati mekanisme autentikasi.
 
@@ -59,7 +60,7 @@ Skrip baca-saja mendeteksi blocker, **tidak** mengubah password, PIN, factor, se
 
 ### Bukti dan batasan
 
-- Saat audit 6 November: **belum ada bukti eksekusi login browser** keempat peran pada target sintetis terkini.
+- Saat audit 6 November: **belum ada bukti eksekusi login browser** keempat peran pada target sintetis terkini. Warga juga terblokir karena fixture tanggal 2027; bukan cukup dengan menambah PIN pengurus dan TOTP Admin.
 - Fixture hanya memuat **1 rumah / 12 bulan unpaid**, sehingga status paid, pending, reversed, waiver, dan adjustment **belum ada sebagai data awal**. Skenario PAY/HOUSE perlu dijalankan berurutan pada fixture terisolasi/disposable dengan hasil dan rollback yang terencana; jangan menyatakan PASS hanya karena tes unit/integrasi sudah tersedia.
 - Gate A menguji unit, integrasi, constraints, authorization, security closure, migration journal, dan build menggunakan database pengujian terisolasi; Gate A bukan pengganti UAT browser.
 - Tes PostgreSQL concurrency independen dan PG18 recovery dalam gate terakhir dilaporkan **SKIPPED**, bukan PASS.
