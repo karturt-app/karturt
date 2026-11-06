@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { NEW_HOUSEHOLD_MONTHLY_FEE_OPTIONS, isNewHouseholdMonthlyFeeOption } from "@/lib/households/fee-options";
 import {
   ArrowLeft,
   ArrowRight,
@@ -159,6 +160,7 @@ export function ChairmanHouseholdManagement() {
   const [createHouseId, setCreateHouseId] = useState("");
   const [createNumber, setCreateNumber] = useState("");
   const [createLabel, setCreateLabel] = useState("");
+  const [createNewHouseMonthlyAmount, setCreateNewHouseMonthlyAmount] = useState<number | "">("");
   const [createStartsOn, setCreateStartsOn] = useState("");
   const [createName, setCreateName] = useState("");
   const [createPhone, setCreatePhone] = useState("");
@@ -210,6 +212,7 @@ export function ChairmanHouseholdManagement() {
     setCreatePhone("");
     setCreateNumber("");
     setCreateLabel("");
+    setCreateNewHouseMonthlyAmount("");
     setCreateStartsOn("");
     setEditName("");
     setEditPhone("");
@@ -283,7 +286,13 @@ export function ChairmanHouseholdManagement() {
       initialPin: createPin,
     };
     if (createHouseId === "new") {
+      if (!isNewHouseholdMonthlyFeeOption(createNewHouseMonthlyAmount)) {
+        setFeedbackKind("error");
+        setFeedback("Pilih tarif bulanan rumah baru terlebih dahulu.");
+        return;
+      }
       body.newHouse = { number: createNumber.trim(), label: createLabel.trim() };
+      body.newHouseMonthlyAmount = createNewHouseMonthlyAmount;
     } else {
       body.houseId = createHouseId;
     }
@@ -475,6 +484,26 @@ export function ChairmanHouseholdManagement() {
               <input id="household-new-number" value={createNumber} onChange={(event) => setCreateNumber(event.target.value)} maxLength={40} required autoComplete="off" />
               <label htmlFor="household-new-label">Label rumah <span>(opsional)</span></label>
               <input id="household-new-label" value={createLabel} onChange={(event) => setCreateLabel(event.target.value)} maxLength={120} autoComplete="off" />
+              <fieldset className="chairman-household-fee-options">
+                <legend>Tarif bulanan rumah baru</legend>
+                <p className="chairman-household-note">
+                  Berlaku mulai {createStartsOn ? monthLabel(createStartsOn.slice(0, 7)) : "bulan mulai tinggal"}. Bulan sebelumnya tidak ditagih.
+                </p>
+                {NEW_HOUSEHOLD_MONTHLY_FEE_OPTIONS.map((amount) => (
+                  <label className="chairman-household-fee-option" key={amount}>
+                    <input
+                      type="radio"
+                      name="household-new-monthly-amount"
+                      value={amount}
+                      checked={createNewHouseMonthlyAmount === amount}
+                      onChange={() => setCreateNewHouseMonthlyAmount(amount)}
+                      required
+                      disabled={submitting}
+                    />
+                    <span>{rupiah(amount)} / bulan</span>
+                  </label>
+                ))}
+              </fieldset>
             </>}
             <label htmlFor="household-starts-on">Mulai tinggal</label>
             <input id="household-starts-on" type="date" value={createStartsOn} min={jakartaBusinessDateValue()} onChange={(event) => setCreateStartsOn(event.target.value)} required disabled={submitting} />

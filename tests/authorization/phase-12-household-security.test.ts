@@ -72,6 +72,7 @@ describe("F12 household lifecycle authorization and adversarial input", () => {
 
   const createInput = {
     newHouse: { number: `NEW-${randomUUID().slice(0, 8)}` },
+    newHouseMonthlyAmount: 40_000,
     startsOn: businessDate,
     fullName: "Penghuni Baru",
     initialPin: validPin,
@@ -173,6 +174,19 @@ describe("F12 household lifecycle authorization and adversarial input", () => {
       ...createInput,
       newHouse: { number: `BAD-${randomUUID().slice(0, 8)}` },
       ...extra,
+    } as never, businessDate)).rejects.toBeInstanceOf(InvalidHouseholdInputError);
+  });
+
+  it.each([
+    ["missing tariff", undefined],
+    ["unsupported tier", 40_001],
+    ["free tier", 0],
+  ])("rejects %s for a new house before writing", async (_description, amount) => {
+    const { chairman } = await createChairmanFixture();
+    await expect(createHouseholdResident(database, chairman, {
+      ...createInput,
+      newHouse: { number: "BAD-TIER-" + randomUUID().slice(0, 8) },
+      newHouseMonthlyAmount: amount,
     } as never, businessDate)).rejects.toBeInstanceOf(InvalidHouseholdInputError);
   });
 

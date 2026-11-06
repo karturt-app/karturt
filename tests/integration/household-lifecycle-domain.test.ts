@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AppDatabase } from "@/db/client";
@@ -15,17 +15,23 @@ import {
   households,
   monthlyDues,
   officialAssignments,
+  paymentAllocations,
+  payments,
   people,
+  rtSettings,
 } from "@/db/schema";
 import { createResidentAuthRecords } from "@/lib/accounts/resident-auth-records";
 import { findUniqueLoginAccount } from "@/lib/auth/login-account";
 import { resolvePrincipalForUser, UnauthenticatedError } from "@/lib/auth/principal";
 import type { Principal } from "@/lib/auth/permissions";
+import { recordTreasurerCashPayment } from "@/lib/billing/treasurer-cash-payments";
+import { jakartaBusinessDate } from "@/lib/officials/lifecycle";
 import {
   createHouseholdResident,
   deactivateHousehold,
   HouseholdConflictError,
   HouseholdForbiddenError,
+  HouseholdLifecycleInvariantError,
   InvalidHouseholdInputError,
   listHouseholdManagement,
   replaceHouseholdResident,
@@ -147,6 +153,7 @@ describe("F12 household lifecycle domain services", () => {
 
     const created = await createHouseholdResident(database, chairman, {
       newHouse: { number: "A-01", label: "Blok A" },
+      newHouseMonthlyAmount: 40_000,
       startsOn: "2026-11-15",
       fullName: "Warga Baru",
       phone: "+62 812-3456-7890",
@@ -167,12 +174,33 @@ describe("F12 household lifecycle domain services", () => {
       eq(auditEvents.action, "household.created"),
       eq(auditEvents.entityId, created.householdId),
     ));
+    const [newHouseRate] = await testDatabase.db.select({
+      id: feeRates.id,
+      householdId: feeRates.householdId,
+      effectiveMonth: feeRates.effectiveMonth,
+      monthlyAmount: feeRates.monthlyAmount,
+      idempotencyKey: feeRates.idempotencyKey,
+      requestFingerprint: feeRates.requestFingerprint,
+    }).from(feeRates).where(eq(feeRates.householdId, created.householdId));
     const managementList = await listHouseholdManagement(database, chairman, "A-01", businessDate);
 
     expect(created).toMatchObject({ startsOn: "2026-11-15", generatedDueCount: 12 });
     expect(dues.filter((due) => due.month <= 10).every((due) => due.status === "not_due")).toBe(true);
     expect(dues.filter((due) => due.month >= 11).every((due) => due.status === "unpaid")).toBe(true);
     expect(account).toMatchObject({ id: created.residentAccountId, loginIdentifier: "A-01", status: "active" });
+    expect(newHouseRate).toMatchObject({
+      householdId: created.householdId,
+      effectiveMonth: 11,
+      monthlyAmount: 40_000,
+    });
+    expect(newHouseRate?.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(newHouseRate?.requestFingerprint).toBe(createHash("sha256").update(JSON.stringify({
+      version: 1,
+      billingYearId,
+      householdId: created.householdId,
+      effectiveMonth: 11,
+      monthlyAmount: 40_000,
+    })).digest("hex"));
     expect(credential?.password).not.toBe("482913");
     expect(credential?.password).toBeTruthy();
     await expect(resolvePrincipalForUser(database, account!.authUserId, businessDate))
@@ -196,15 +224,30 @@ describe("F12 household lifecycle domain services", () => {
       financialHistory: { dueCount: 12, unpaidCount: 2, notDueCount: 10 },
     });
     expect(managementList.availableHouses.some((house) => house.houseId === created.houseId)).toBe(false);
+
+    await expect(createHouseholdResident(database, chairman, {
+      newHouse: { number: "A-01", label: "Blok A" },
+      newHouseMonthlyAmount: 40_000,
+      startsOn: "2026-11-15",
+      fullName: "Warga Baru",
+      phone: "+62 812-3456-7890",
+      initialPin: "482913",
+    }, businessDate)).rejects.toBeInstanceOf(HouseholdConflictError);
+    expect(await testDatabase.db.select({ id: feeRates.id }).from(feeRates)
+      .where(eq(feeRates.householdId, created.householdId))).toHaveLength(1);
+    expect(await testDatabase.db.select({ id: monthlyDues.id }).from(monthlyDues)
+      .where(eq(monthlyDues.householdId, created.householdId))).toHaveLength(12);
   });
 
   it("classifies a case-insensitive duplicate house number and rolls the new-house transaction back", async () => {
     const { chairman, rtUnitId, original } = await createChairmanFixture();
+    await openBillingYear(rtUnitId);
     const [existingHouse] = await testDatabase.db.select({ number: houses.number })
       .from(houses).where(eq(houses.id, original.houseId));
 
     await expect(createHouseholdResident(database, chairman, {
       newHouse: { number: existingHouse!.number.toLowerCase() },
+      newHouseMonthlyAmount: 40_000,
       startsOn: businessDate,
       fullName: "Penghuni Baru",
       initialPin: "482913",
@@ -218,6 +261,7 @@ describe("F12 household lifecycle domain services", () => {
 
   it("classifies an active resident login collision without retaining the newly inserted house", async () => {
     const { chairman, rtUnitId } = await createChairmanFixture();
+    await openBillingYear(rtUnitId);
     const otherRtUnitId = await createRt(testDatabase.db);
     const otherHousehold = await createHousehold(testDatabase.db, otherRtUnitId, {
       number: `LOGIN-${randomUUID().slice(0, 8)}`,
@@ -233,6 +277,7 @@ describe("F12 household lifecycle domain services", () => {
 
     await expect(createHouseholdResident(database, chairman, {
       newHouse: { number: otherHouse!.number },
+      newHouseMonthlyAmount: 40_000,
       startsOn: businessDate,
       fullName: "Penghuni Baru",
       initialPin: "482913",
@@ -258,30 +303,222 @@ describe("F12 household lifecycle domain services", () => {
       .where(eq(households.houseId, original.houseId))).toHaveLength(1);
   });
 
-  it("maps a missing applicable open-year tariff to a safe conflict and rolls the create back", async () => {
+  it("creates a new household at the selected tier when the open year has no general tariff", async () => {
     const { chairman, rtUnitId } = await createChairmanFixture();
+    const currentDate = jakartaBusinessDate();
+    const currentMonth = Number(currentDate.slice(5, 7));
+    const currentYear = Number(currentDate.slice(0, 4));
     await testDatabase.db.insert(billingYears).values({
       rtUnitId,
-      year: 2026,
+      year: currentYear,
       status: "open",
     });
 
-    await expect(createHouseholdResident(database, chairman, {
+    const created = await createHouseholdResident(database, chairman, {
       newHouse: { number: "NO-RATE-01" },
-      startsOn: "2026-11-15",
+      newHouseMonthlyAmount: 32_000,
+      startsOn: currentDate,
       fullName: "Penghuni Baru",
       initialPin: "482913",
-    }, businessDate)).rejects.toMatchObject({ code: "MISSING_FEE_RATE" });
+    }, currentDate);
+    const rates = await testDatabase.db.select({ householdId: feeRates.householdId, effectiveMonth: feeRates.effectiveMonth, monthlyAmount: feeRates.monthlyAmount })
+      .from(feeRates).where(eq(feeRates.householdId, created.householdId));
+    const dues = await testDatabase.db.select({ month: monthlyDues.month, amount: monthlyDues.amount, status: monthlyDues.status, feeRateId: monthlyDues.feeRateId })
+      .from(monthlyDues).where(eq(monthlyDues.householdId, created.householdId)).orderBy(monthlyDues.month);
 
-    expect(await testDatabase.db.select({ id: houses.id }).from(houses)
-      .where(eq(houses.number, "NO-RATE-01"))).toHaveLength(0);
-    expect(await testDatabase.db.select({ id: households.id }).from(households)
-      .innerJoin(houses, eq(houses.id, households.houseId))
-      .where(eq(houses.number, "NO-RATE-01"))).toHaveLength(0);
+    expect(rates).toEqual([{ householdId: created.householdId, effectiveMonth: currentMonth, monthlyAmount: 32_000 }]);
+    expect(dues).toHaveLength(12);
+    expect(dues.filter((due) => due.month < currentMonth).every((due) => due.status === "not_due" && due.amount === 0 && due.feeRateId === null)).toBe(true);
+    expect(dues.filter((due) => due.month >= currentMonth).every((due) => due.status === "unpaid" && due.amount === 32_000 && typeof due.feeRateId === "string")).toBe(true);
+  });
+
+  it.skipIf(Number(jakartaBusinessDate().slice(5, 7)) === 12)("charges a future joining month only from that month using the selected tier", async () => {
+    const currentDate = jakartaBusinessDate();
+    const currentMonth = Number(currentDate.slice(5, 7));
+    const nextMonth = currentMonth + 1;
+    const currentYear = Number(currentDate.slice(0, 4));
+    const { chairman, rtUnitId } = await createChairmanFixture();
+    await testDatabase.db.insert(billingYears).values({ rtUnitId, year: currentYear, status: "open" });
+
+    const created = await createHouseholdResident(database, chairman, {
+      newHouse: { number: "FUTURE-MONTH-01" },
+      newHouseMonthlyAmount: 40_000,
+      startsOn: currentYear + "-" + String(nextMonth).padStart(2, "0") + "-01",
+      fullName: "Penghuni Bulan Depan",
+      initialPin: "482913",
+    }, currentDate);
+    const [rate] = await testDatabase.db.select({ effectiveMonth: feeRates.effectiveMonth, monthlyAmount: feeRates.monthlyAmount })
+      .from(feeRates).where(eq(feeRates.householdId, created.householdId));
+    const dues = await testDatabase.db.select({ month: monthlyDues.month, amount: monthlyDues.amount, status: monthlyDues.status })
+      .from(monthlyDues).where(eq(monthlyDues.householdId, created.householdId)).orderBy(monthlyDues.month);
+
+    expect(rate).toEqual({ effectiveMonth: nextMonth, monthlyAmount: 40_000 });
+    expect(dues).toHaveLength(12);
+    expect(dues.filter((due) => due.month < nextMonth).every((due) => due.status === "not_due" && due.amount === 0)).toBe(true);
+    expect(dues.filter((due) => due.month >= nextMonth).every((due) => due.status === "unpaid" && due.amount === 40_000)).toBe(true);
+  });
+
+  it("keeps the existing-house flow free of a forced tariff selection", async () => {
+    const currentDate = jakartaBusinessDate();
+    const currentMonth = Number(currentDate.slice(5, 7));
+    const currentYear = Number(currentDate.slice(0, 4));
+    const { chairman, rtUnitId } = await createChairmanFixture();
+    const [year] = await testDatabase.db.insert(billingYears).values({ rtUnitId, year: currentYear, status: "open" })
+      .returning({ id: billingYears.id });
+    await createFeeRateFixture(testDatabase.db, {
+      rtUnitId,
+      billingYearId: year!.id,
+      effectiveMonth: currentMonth,
+      monthlyAmount: 40_000,
+    });
+    const [house] = await testDatabase.db.insert(houses).values({ rtUnitId, number: "EXISTING-HOUSE-01" })
+      .returning({ id: houses.id });
+
+    const created = await createHouseholdResident(database, chairman, {
+      houseId: house!.id,
+      startsOn: currentDate,
+      fullName: "Penghuni Rumah Terdaftar",
+      initialPin: "482913",
+    }, currentDate);
+
+    expect(await testDatabase.db.select({ id: feeRates.id }).from(feeRates)
+      .where(eq(feeRates.householdId, created.householdId))).toHaveLength(0);
+    const dues = await testDatabase.db.select({ month: monthlyDues.month, amount: monthlyDues.amount, status: monthlyDues.status })
+      .from(monthlyDues).where(eq(monthlyDues.householdId, created.householdId));
+    expect(dues).toHaveLength(12);
+    expect(dues.filter((due) => due.month < currentMonth).every((due) => due.status === "not_due" && due.amount === 0)).toBe(true);
+    expect(dues.filter((due) => due.month >= currentMonth).every((due) => due.status === "unpaid" && due.amount === 40_000)).toBe(true);
+  });
+
+  it("rolls back house, household, resident account, tariff, audit, and dues together", async () => {
+    const currentDate = jakartaBusinessDate();
+    const currentYear = Number(currentDate.slice(0, 4));
+    const { chairman, rtUnitId } = await createChairmanFixture();
+    const [year] = await testDatabase.db.insert(billingYears).values({ rtUnitId, year: currentYear, status: "open" })
+      .returning({ id: billingYears.id });
+    await testDatabase.db.delete(rtSettings).where(eq(rtSettings.rtUnitId, rtUnitId));
+
+    await expect(createHouseholdResident(database, chairman, {
+      newHouse: { number: "ROLLBACK-01" },
+      newHouseMonthlyAmount: 32_000,
+      startsOn: currentDate,
+      fullName: "Penghuni Rollback",
+      initialPin: "482913",
+    }, currentDate)).rejects.toBeInstanceOf(HouseholdLifecycleInvariantError);
+
+    expect(await testDatabase.db.select({ id: houses.id }).from(houses).where(eq(houses.number, "ROLLBACK-01"))).toHaveLength(0);
+    expect(await testDatabase.db.select({ id: households.id }).from(households).where(eq(households.rtUnitId, rtUnitId))).toHaveLength(1);
+    expect(await testDatabase.db.select({ id: people.id }).from(people).where(eq(people.fullName, "Penghuni Rollback"))).toHaveLength(0);
+    expect(await testDatabase.db.select({ id: appAccounts.id }).from(appAccounts).where(eq(appAccounts.loginIdentifier, "ROLLBACK-01"))).toHaveLength(0);
+    expect(await testDatabase.db.select({ id: authUser.id }).from(authUser).where(eq(authUser.name, "Penghuni Rollback"))).toHaveLength(0);
+    expect(await testDatabase.db.select({ id: feeRates.id }).from(feeRates).where(eq(feeRates.billingYearId, year!.id))).toHaveLength(0);
+    expect(await testDatabase.db.select({ id: monthlyDues.id }).from(monthlyDues).where(eq(monthlyDues.billingYearId, year!.id))).toHaveLength(0);
+    expect(await testDatabase.db.select({ id: auditEvents.id }).from(auditEvents).where(and(
+      eq(auditEvents.action, "fee_rate.created"),
+      eq(auditEvents.actorAppAccountId, chairman.appAccountId),
+    ))).toHaveLength(0);
+  });
+
+  it("leaves old tariff, paid dues, payment ledger, and allocations unchanged", async () => {
+    const currentDate = jakartaBusinessDate();
+    const currentYear = Number(currentDate.slice(0, 4));
+    const { chairman, rtUnitId, original } = await createChairmanFixture();
+    const [year] = await testDatabase.db.insert(billingYears).values({ rtUnitId, year: currentYear, status: "open" })
+      .returning({ id: billingYears.id });
+    const [generalRate] = await createFeeRateFixture(testDatabase.db, {
+      rtUnitId,
+      billingYearId: year!.id,
+      effectiveMonth: 1,
+      monthlyAmount: 40_000,
+    });
+    await addOldAnnualDues(rtUnitId, original.householdId, year!.id);
+
+    const treasurerAuth = await createAuthUser(testDatabase.db, "F12 history treasurer");
+    const [treasurerAccount] = await testDatabase.db.insert(appAccounts).values({
+      rtUnitId,
+      authUserId: treasurerAuth.id,
+      accountType: "official",
+      loginIdentifier: "treasurer-" + randomUUID(),
+      personId: original.personId,
+    }).returning({ id: appAccounts.id });
+    await testDatabase.db.insert(officialAssignments).values({
+      rtUnitId,
+      appAccountId: treasurerAccount!.id,
+      role: "treasurer",
+      startsOn: "2020-01-01",
+    });
+    const treasurer: Principal = {
+      authUserId: treasurerAuth.id,
+      appAccountId: treasurerAccount!.id,
+      role: "treasurer",
+      rtUnitId,
+      householdId: null,
+      personId: original.personId,
+    };
+    await recordTreasurerCashPayment(database, treasurer, {
+      householdId: original.householdId,
+      period: String(currentYear) + "-01",
+      idempotencyKey: randomUUID(),
+    }, currentDate);
+
+    const oldDuesBefore = await testDatabase.db.select().from(monthlyDues).where(eq(monthlyDues.householdId, original.householdId));
+    const oldRateBefore = await testDatabase.db.select().from(feeRates).where(eq(feeRates.id, generalRate!.id));
+    const paymentsBefore = await testDatabase.db.select().from(payments).where(eq(payments.rtUnitId, rtUnitId));
+    const allocationsBefore = await testDatabase.db.select().from(paymentAllocations).where(eq(paymentAllocations.rtUnitId, rtUnitId));
+
+    await createHouseholdResident(database, chairman, {
+      newHouse: { number: "NEW-HISTORY-01" },
+      newHouseMonthlyAmount: 32_000,
+      startsOn: currentDate,
+      fullName: "Penghuni Baru Tanpa Ubah Riwayat",
+      initialPin: "482913",
+    }, currentDate);
+
+    expect(await testDatabase.db.select().from(monthlyDues).where(eq(monthlyDues.householdId, original.householdId))).toEqual(oldDuesBefore);
+    expect(await testDatabase.db.select().from(feeRates).where(eq(feeRates.id, generalRate!.id))).toEqual(oldRateBefore);
+    expect(await testDatabase.db.select().from(payments).where(eq(payments.rtUnitId, rtUnitId))).toEqual(paymentsBefore);
+    expect(await testDatabase.db.select().from(paymentAllocations).where(eq(paymentAllocations.rtUnitId, rtUnitId))).toEqual(allocationsBefore);
+  });
+
+  it("rejects a future-year tariff and leaves no partial new-house records", async () => {
+    const { chairman, rtUnitId } = await createChairmanFixture();
+    const currentDate = jakartaBusinessDate();
+    const currentYear = Number(currentDate.slice(0, 4));
+    await testDatabase.db.insert(billingYears).values({ rtUnitId, year: currentYear + 1, status: "open" });
+
+    await expect(createHouseholdResident(database, chairman, {
+      newHouse: { number: "FUTURE-YEAR-01" },
+      newHouseMonthlyAmount: 40_000,
+      startsOn: `${currentYear + 1}-01-01`,
+      fullName: "Penghuni Masa Depan",
+      initialPin: "482913",
+    }, currentDate)).rejects.toBeInstanceOf(HouseholdConflictError);
+
+    expect(await testDatabase.db.select({ id: houses.id }).from(houses).where(eq(houses.number, "FUTURE-YEAR-01"))).toHaveLength(0);
+    expect(await testDatabase.db.select({ id: households.id }).from(households).innerJoin(houses, eq(houses.id, households.houseId)).where(eq(houses.number, "FUTURE-YEAR-01"))).toHaveLength(0);
+    expect(await testDatabase.db.select({ id: people.id }).from(people).where(eq(people.fullName, "Penghuni Masa Depan"))).toHaveLength(0);
+    expect(await testDatabase.db.select({ id: feeRates.id }).from(feeRates).where(eq(feeRates.rtUnitId, rtUnitId))).toHaveLength(0);
+    expect(await testDatabase.db.select({ id: monthlyDues.id }).from(monthlyDues).where(eq(monthlyDues.rtUnitId, rtUnitId))).toHaveLength(0);
+
+    await testDatabase.db.update(billingYears).set({ status: "closed" }).where(and(
+      eq(billingYears.rtUnitId, rtUnitId), eq(billingYears.year, currentYear + 1),
+    ));
+    await testDatabase.db.insert(billingYears).values({ rtUnitId, year: currentYear, status: "closed" });
+    await expect(createHouseholdResident(database, chairman, {
+      newHouse: { number: "CLOSED-YEAR-01" },
+      newHouseMonthlyAmount: 40_000,
+      startsOn: currentDate,
+      fullName: "Penghuni Tahun Tertutup",
+      initialPin: "482913",
+    }, currentDate)).rejects.toBeInstanceOf(HouseholdConflictError);
+    expect(await testDatabase.db.select({ id: houses.id }).from(houses).where(eq(houses.number, "CLOSED-YEAR-01"))).toHaveLength(0);
   });
 
   it("uses a generic safe code for other wrapped unique violations and rolls the create back", async () => {
     const { chairman, rtUnitId } = await createChairmanFixture();
+    const currentDate = jakartaBusinessDate();
+    const currentYear = Number(currentDate.slice(0, 4));
+    await testDatabase.db.insert(billingYears).values({ rtUnitId, year: currentYear, status: "open" });
     const functionName = `phase12_generic_conflict_${randomUUID().replaceAll("-", "")}`;
     const triggerName = `${functionName}_trigger`;
     await testDatabase.client.exec(`
@@ -301,10 +538,11 @@ describe("F12 household lifecycle domain services", () => {
     try {
       await expect(createHouseholdResident(database, chairman, {
         newHouse: { number: "GENERIC-CONFLICT" },
-        startsOn: businessDate,
+        newHouseMonthlyAmount: 32_000,
+        startsOn: currentDate,
         fullName: "Penghuni Baru",
         initialPin: "482913",
-      }, businessDate)).rejects.toMatchObject({ code: "GENERIC_CONFLICT" });
+      }, currentDate)).rejects.toMatchObject({ code: "GENERIC_CONFLICT" });
     } finally {
       await testDatabase.client.exec(`DROP TRIGGER ${triggerName} ON public.audit_events; DROP FUNCTION public.${functionName}();`);
     }
@@ -317,9 +555,11 @@ describe("F12 household lifecycle domain services", () => {
 
   it("edits only the resident profile and house label, and records changed field names", async () => {
     const { chairman, rtUnitId } = await createChairmanFixture();
+    await openBillingYear(rtUnitId);
     const created = await createHouseholdResident(database, chairman, {
       newHouse: { number: "B-02" },
-      startsOn: businessDate,
+      newHouseMonthlyAmount: 40_000,
+      startsOn: "2026-11-15",
       fullName: "Nama Sebelum",
       phone: "081234567890",
       initialPin: "543210",

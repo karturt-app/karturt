@@ -880,6 +880,10 @@ button { color: inherit; }
 .chairman-household-form input, .chairman-household-form select, .chairman-household-form textarea { width: 100%; min-width: 0; min-height: 50px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; color: var(--ink); background: var(--surface-raised); font: inherit; }
 .chairman-household-form input:focus-visible, .chairman-household-form select:focus-visible, .chairman-household-form textarea:focus-visible { border-color: var(--teal); }
 .chairman-household-form input[type="password"] { letter-spacing: .18em; font-variant-numeric: tabular-nums; }
+.chairman-household-fee-options { min-width: 0; margin: 0; padding: 11px; display: grid; gap: 8px; border: 1px solid var(--line-strong); border-radius: 11px; }
+.chairman-household-fee-options legend { padding-inline: 5px; font-size: 14px; font-weight: 750; }
+.chairman-household-fee-option { min-width: 0; min-height: 46px; padding: 8px 10px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface-raised); font-size: 14px; font-weight: 700; cursor: pointer; }
+.chairman-household-form input[type="radio"] { width: 20px; min-height: 20px; margin: 0; padding: 0; flex: 0 0 20px; accent-color: var(--teal); }
 .chairman-household-form textarea { min-height: 94px; resize: vertical; }
 .chairman-household-form-actions { min-width: 0; margin-top: 6px; display: grid; gap: 8px; }
 .chairman-household-form-actions > button { width: 100%; }

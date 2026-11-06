@@ -454,8 +454,14 @@ export async function bootstrapR2SyntheticFixture(
       idempotencyKey: randomUUID(),
     }, businessDate);
     await activateBillingYear(tx, chairman, { billingYearId: billingYear.id });
+    const [syntheticHouse] = await tx.insert(houses).values({
+      rtUnitId,
+      number: fixture.houseNumber,
+      label: "Rumah sintetis",
+    }).returning({ id: houses.id });
+    if (!syntheticHouse) throw new Error("R2 synthetic house could not be created.");
     await createHouseholdResident(tx, chairman, {
-      newHouse: { number: fixture.houseNumber, label: "Rumah sintetis" },
+      houseId: syntheticHouse.id,
       startsOn,
       fullName: "Warga Sintetis 101",
       initialPin: credentials.residentPin,

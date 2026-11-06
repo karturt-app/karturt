@@ -346,8 +346,8 @@ export const feeRates = pgTable("fee_rates", {
   check("fee_rates_effective_month_valid", sql`${table.effectiveMonth} between 1 and 12`),
   check("fee_rates_positive_amount", sql`${table.monthlyAmount} > 0`),
   check(
-    "fee_rates_sheet2_import_scope",
-    sql`(${table.sheet2ImportBatchId} is null and ${table.householdId} is null) or (${table.sheet2ImportBatchId} is not null and ${table.householdId} is not null and ${table.createdByAccountId} is null and ${table.createdByAccountType} is null and ${table.idempotencyKey} is null and ${table.requestFingerprint} is null and ${table.effectiveMonth} = 1)`,
+    "fee_rates_source_scope",
+    sql`(${table.sheet2ImportBatchId} is null and (${table.householdId} is null or (${table.householdId} is not null and ${table.createdByAccountId} is not null and ${table.createdByAccountType} = 'official' and ${table.idempotencyKey} is not null and ${table.requestFingerprint} ~ '^[0-9a-f]{64}$'))) or (${table.sheet2ImportBatchId} is not null and ${table.householdId} is not null and ${table.createdByAccountId} is null and ${table.createdByAccountType} is null and ${table.idempotencyKey} is null and ${table.requestFingerprint} is null and ${table.effectiveMonth} = 1)`,
   ),
   check(
     "fee_rates_f11_audit_metadata_complete",

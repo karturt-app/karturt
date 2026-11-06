@@ -122,6 +122,22 @@ describe("F12 Chairman household API strict security boundary", () => {
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["missing new-house tariff", undefined],
+    ["unsupported new-house tariff", 40_001],
+    ["tariff attached to an existing house", 40_000],
+  ])("rejects %s at the route boundary", async (_description, amount) => {
+    const body = amount === 40_000
+      ? { houseId: householdId, startsOn: "2026-10-03", fullName: "Warga", initialPin: "482913", newHouseMonthlyAmount: amount }
+      : { newHouse: { number: "A-TIER" }, startsOn: "2026-10-03", fullName: "Warga", initialPin: "482913", ...(amount === undefined ? {} : { newHouseMonthlyAmount: amount }) };
+    const response = await createHousehold(jsonRequest("http://localhost:3000/api/chairman/households", "POST", body));
+
+    expect(response.status).toBe(400);
+    expect(mocks.principal).not.toHaveBeenCalled();
+    expect(mocks.getDb).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
   it("rejects cross-origin mutation before parsing or revealing household data", async () => {
     const response = await createHousehold(new Request("http://localhost:3000/api/chairman/households", {
       method: "POST",
@@ -140,6 +156,7 @@ describe("F12 Chairman household API strict security boundary", () => {
     mocks.create.mockRejectedValue(new HouseholdForbiddenError("Forbidden: private scope marker"));
     const response = await createHousehold(jsonRequest("http://localhost:3000/api/chairman/households", "POST", {
       newHouse: { number: "A-04" },
+      newHouseMonthlyAmount: 40_000,
       startsOn: "2026-10-03",
       fullName: "Warga",
       initialPin: "482913",
