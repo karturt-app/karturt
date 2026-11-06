@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { MfaEnrollmentRequiredError, UnauthenticatedError } from "@/lib/auth/principal";
+import { householdConflictMessage, normalizeHouseholdConflictCode } from "@/lib/households/conflicts";
 import {
   HouseholdConflictError,
   HouseholdForbiddenError,
@@ -28,8 +29,10 @@ export function householdErrorResponse(error: unknown, operation: "load" | "save
     return householdJson({ message: "Rumah atau data warga tidak ditemukan dalam cakupan yang diizinkan." }, 404);
   }
   if (error instanceof HouseholdConflictError) {
+    const code = normalizeHouseholdConflictCode(error.code);
     return householdJson({
-      message: "Perubahan belum dapat dilakukan karena periode atau riwayat terkait. Muat ulang lalu tinjau datanya.",
+      code,
+      message: householdConflictMessage(code),
     }, 409);
   }
   return householdJson({

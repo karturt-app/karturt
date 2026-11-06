@@ -198,6 +198,66 @@ describe("F12 household lifecycle domain services", () => {
     expect(managementList.availableHouses.some((house) => house.houseId === created.houseId)).toBe(false);
   });
 
+  it("classifies a case-insensitive duplicate house number and rolls the new-house transaction back", async () => {
+    const { chairman, rtUnitId, original } = await createChairmanFixture();
+    const [existingHouse] = await testDatabase.db.select({ number: houses.number })
+      .from(houses).where(eq(houses.id, original.houseId));
+
+    await expect(createHouseholdResident(database, chairman, {
+      newHouse: { number: existingHouse!.number.toLowerCase() },
+      startsOn: businessDate,
+      fullName: "Penghuni Baru",
+      initialPin: "482913",
+    }, businessDate)).rejects.toMatchObject({ code: "DUPLICATE_HOUSE_NUMBER" });
+
+    expect(await testDatabase.db.select({ id: houses.id }).from(houses)
+      .where(eq(houses.rtUnitId, rtUnitId))).toHaveLength(1);
+    expect(await testDatabase.db.select({ id: households.id }).from(households)
+      .where(eq(households.houseId, original.houseId))).toHaveLength(1);
+  });
+
+  it("classifies an active resident login collision without retaining the newly inserted house", async () => {
+    const { chairman, rtUnitId } = await createChairmanFixture();
+    const otherRtUnitId = await createRt(testDatabase.db);
+    const otherHousehold = await createHousehold(testDatabase.db, otherRtUnitId, {
+      number: `LOGIN-${randomUUID().slice(0, 8)}`,
+    });
+    const [otherHouse] = await testDatabase.db.select({ number: houses.number })
+      .from(houses).where(eq(houses.id, otherHousehold.houseId));
+    await addResidentAccount({
+      rtUnitId: otherRtUnitId,
+      houseId: otherHousehold.houseId,
+      householdId: otherHousehold.householdId,
+      personId: otherHousehold.personId,
+    });
+
+    await expect(createHouseholdResident(database, chairman, {
+      newHouse: { number: otherHouse!.number },
+      startsOn: businessDate,
+      fullName: "Penghuni Baru",
+      initialPin: "482913",
+    }, businessDate)).rejects.toMatchObject({ code: "ACTIVE_LOGIN_COLLISION" });
+
+    expect(await testDatabase.db.select({ id: houses.id }).from(houses).where(and(
+      eq(houses.rtUnitId, rtUnitId),
+      eq(houses.number, otherHouse!.number),
+    ))).toHaveLength(0);
+  });
+
+  it("classifies overlapping occupancy as a household-period conflict", async () => {
+    const { chairman, original } = await createChairmanFixture();
+
+    await expect(createHouseholdResident(database, chairman, {
+      houseId: original.houseId,
+      startsOn: businessDate,
+      fullName: "Penghuni Baru",
+      initialPin: "482913",
+    }, businessDate)).rejects.toMatchObject({ code: "HOUSEHOLD_PERIOD_OVERLAP" });
+
+    expect(await testDatabase.db.select({ id: households.id }).from(households)
+      .where(eq(households.houseId, original.houseId))).toHaveLength(1);
+  });
+
   it("maps a missing applicable open-year tariff to a safe conflict and rolls the create back", async () => {
     const { chairman, rtUnitId } = await createChairmanFixture();
     await testDatabase.db.insert(billingYears).values({
@@ -211,13 +271,48 @@ describe("F12 household lifecycle domain services", () => {
       startsOn: "2026-11-15",
       fullName: "Penghuni Baru",
       initialPin: "482913",
-    }, businessDate)).rejects.toBeInstanceOf(HouseholdConflictError);
+    }, businessDate)).rejects.toMatchObject({ code: "MISSING_FEE_RATE" });
 
     expect(await testDatabase.db.select({ id: houses.id }).from(houses)
       .where(eq(houses.number, "NO-RATE-01"))).toHaveLength(0);
     expect(await testDatabase.db.select({ id: households.id }).from(households)
       .innerJoin(houses, eq(houses.id, households.houseId))
       .where(eq(houses.number, "NO-RATE-01"))).toHaveLength(0);
+  });
+
+  it("uses a generic safe code for other wrapped unique violations and rolls the create back", async () => {
+    const { chairman, rtUnitId } = await createChairmanFixture();
+    const functionName = `phase12_generic_conflict_${randomUUID().replaceAll("-", "")}`;
+    const triggerName = `${functionName}_trigger`;
+    await testDatabase.client.exec(`
+      CREATE FUNCTION public.${functionName}() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.action = 'household.created' THEN
+          RAISE EXCEPTION 'forced household conflict' USING ERRCODE = '23505', CONSTRAINT = 'private_constraint_marker';
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+      CREATE TRIGGER ${triggerName}
+      BEFORE INSERT ON public.audit_events
+      FOR EACH ROW EXECUTE FUNCTION public.${functionName}();
+    `);
+
+    try {
+      await expect(createHouseholdResident(database, chairman, {
+        newHouse: { number: "GENERIC-CONFLICT" },
+        startsOn: businessDate,
+        fullName: "Penghuni Baru",
+        initialPin: "482913",
+      }, businessDate)).rejects.toMatchObject({ code: "GENERIC_CONFLICT" });
+    } finally {
+      await testDatabase.client.exec(`DROP TRIGGER ${triggerName} ON public.audit_events; DROP FUNCTION public.${functionName}();`);
+    }
+
+    expect(await testDatabase.db.select({ id: houses.id }).from(houses).where(and(
+      eq(houses.rtUnitId, rtUnitId),
+      eq(houses.number, "GENERIC-CONFLICT"),
+    ))).toHaveLength(0);
   });
 
   it("edits only the resident profile and house label, and records changed field names", async () => {

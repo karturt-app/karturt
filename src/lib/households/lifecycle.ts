@@ -21,6 +21,7 @@ import {
 import { appendAuditEvent, normalizeAuditReason } from "@/lib/audit/writer";
 import { resolveResidentProvisioningTarget } from "@/lib/accounts/resident-provisioning";
 import { createResidentAuthRecords } from "@/lib/accounts/resident-auth-records";
+import type { HouseholdConflictCode } from "@/lib/households/conflicts";
 import { canPerform, type Principal } from "@/lib/auth/permissions";
 import { getDueFinancialBalances } from "@/lib/billing/due-balance";
 import { buildAnnualDues } from "@/lib/billing/generator";
@@ -38,7 +39,15 @@ const MAX_SEARCH_LENGTH = 80;
 export class InvalidHouseholdInputError extends Error {}
 export class HouseholdForbiddenError extends Error {}
 export class HouseholdNotFoundError extends Error {}
-export class HouseholdConflictError extends Error {}
+export class HouseholdConflictError extends Error {
+  readonly code: HouseholdConflictCode;
+
+  constructor(message: string, code: HouseholdConflictCode = "GENERIC_CONFLICT") {
+    super(message);
+    this.name = "HouseholdConflictError";
+    this.code = code;
+  }
+}
 export class HouseholdLifecycleInvariantError extends Error {}
 
 const InvalidHouseholdLifecycleInputError = InvalidHouseholdInputError;
@@ -457,7 +466,10 @@ async function assertNoCurrentLoginCollision(
     ))
     .limit(2);
   if (matches.length > 0) {
-    throw new HouseholdLifecycleConflictError("Nomor rumah ini masih dipakai sebagai login warga aktif. Selesaikan siklus rumah lama terlebih dahulu.");
+    throw new HouseholdLifecycleConflictError(
+      "Nomor rumah ini masih dipakai sebagai login warga aktif.",
+      "ACTIVE_LOGIN_COLLISION",
+    );
   }
 }
 
@@ -507,7 +519,10 @@ async function addOpenYearDues(
     // A missing applicable tariff is an expected setup conflict for this
     // operation. Preserve all other generator errors as invariant failures.
     if (error instanceof Error && /^No fee rate is configured for \d{4}-(0[1-9]|1[0-2])\.$/.test(error.message)) {
-      throw new HouseholdLifecycleConflictError("Tarif belum tersedia untuk salah satu bulan masa huni. Atur tarif sebelum menambahkan penghuni.");
+      throw new HouseholdLifecycleConflictError(
+        "Tarif belum tersedia untuk salah satu bulan masa huni.",
+        "MISSING_FEE_RATE",
+      );
     }
     throw error;
   }
@@ -597,27 +612,53 @@ async function validateNoOverlappingHousehold(
     household.id !== excludeHouseholdId &&
     (household.endsOn === null || household.endsOn >= startsOn),
   );
-  if (overlaps) throw new HouseholdLifecycleConflictError("Rumah sudah memiliki masa huni yang bertumpang tindih pada tanggal tersebut.");
+  if (overlaps) {
+    throw new HouseholdLifecycleConflictError(
+      "Rumah sudah memiliki masa huni yang bertumpang tindih.",
+      "HOUSEHOLD_PERIOD_OVERLAP",
+    );
+  }
 }
 
 function escapeLike(value: string) {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
+function findPostgresConstraintError(error: unknown) {
+  let candidate: unknown = error;
+  for (let depth = 0; depth < 4 && candidate && typeof candidate === "object"; depth += 1) {
+    const dbError = candidate as { code?: unknown; constraint?: unknown; cause?: unknown };
+    if (typeof dbError.code === "string" && typeof dbError.constraint === "string") {
+      return { code: dbError.code, constraint: dbError.constraint };
+    }
+    candidate = dbError.cause;
+  }
+  return null;
+}
+
+function householdConflictCodeForPostgresError(error: unknown): HouseholdConflictCode | null {
+  const dbError = findPostgresConstraintError(error);
+  if (!dbError) return null;
+
+  if (dbError.code === "23505") {
+    if (dbError.constraint === "houses_rt_number_uq") return "DUPLICATE_HOUSE_NUMBER";
+    if (dbError.constraint === "app_accounts_resident_login_uq") return "ACTIVE_LOGIN_COLLISION";
+    if (dbError.constraint === "households_one_active_per_house_uq") return "HOUSEHOLD_PERIOD_OVERLAP";
+    return "GENERIC_CONFLICT";
+  }
+  if (dbError.code === "23514" && dbError.constraint === "households_period_overlap") {
+    return "HOUSEHOLD_PERIOD_OVERLAP";
+  }
+  return null;
+}
+
 async function translateLifecycleConstraint<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
   } catch (error) {
-    let candidate: unknown = error;
-    for (let depth = 0; depth < 4 && candidate && typeof candidate === "object"; depth += 1) {
-      const dbError = candidate as { code?: unknown; constraint?: unknown; cause?: unknown };
-      if (
-        (dbError.code === "23505" && typeof dbError.constraint === "string") ||
-        (dbError.code === "23514" && ["households_period_overlap", "households_one_active_per_house_uq"].includes(String(dbError.constraint)))
-      ) {
-        throw new HouseholdLifecycleConflictError("Rumah, masa huni, atau nomor login berubah bersamaan. Muat ulang lalu coba kembali.");
-      }
-      candidate = dbError.cause;
+    const code = householdConflictCodeForPostgresError(error);
+    if (code) {
+      throw new HouseholdLifecycleConflictError("Data rumah bertentangan dengan catatan yang ada.", code);
     }
     throw error;
   }
@@ -644,11 +685,20 @@ export async function createHouseholdResident(
           hashtextextended(${`karturt:new-house:${rtUnitId}:${canonicalHouseNumber.toUpperCase()}`}, 0)
         )
       `);
-      const [createdHouse] = await transaction.insert(houses).values({
-        rtUnitId,
-        number: canonicalHouseNumber,
-        label: normalized.houseLabel,
-      }).returning({ id: houses.id });
+      let createdHouse: { id: string } | undefined;
+      try {
+        [createdHouse] = await transaction.insert(houses).values({
+          rtUnitId,
+          number: canonicalHouseNumber,
+          label: normalized.houseLabel,
+        }).returning({ id: houses.id });
+      } catch (error) {
+        const dbError = findPostgresConstraintError(error);
+        if (dbError?.code === "23505" && dbError.constraint === "houses_rt_number_uq") {
+          throw new HouseholdLifecycleConflictError("Nomor rumah sudah terdaftar.", "DUPLICATE_HOUSE_NUMBER");
+        }
+        throw error;
+      }
       if (!createdHouse) throw new HouseholdLifecycleInvariantError("Rumah baru tidak dapat dibuat.");
       houseId = createdHouse.id;
     }

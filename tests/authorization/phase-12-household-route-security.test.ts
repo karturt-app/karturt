@@ -34,6 +34,7 @@ import { POST as createHousehold } from "@/app/api/chairman/households/route";
 import { PATCH as updateHousehold } from "@/app/api/chairman/households/[householdId]/route";
 import { POST as deactivateHousehold } from "@/app/api/chairman/households/[householdId]/deactivate/route";
 import { POST as replaceHouseholdResident } from "@/app/api/chairman/households/[householdId]/replace/route";
+import { HouseholdForbiddenError } from "@/lib/households/lifecycle";
 
 const householdId = "00000000-0000-4000-8000-000000000001";
 const personId = "00000000-0000-4000-8000-000000000002";
@@ -132,5 +133,22 @@ describe("F12 Chairman household API strict security boundary", () => {
     expect(mocks.principal).not.toHaveBeenCalled();
     expect(mocks.getDb).not.toHaveBeenCalled();
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps non-Chairman authorization failures as safe 403 responses", async () => {
+    mocks.principal.mockResolvedValue({ role: "treasurer", rtUnitId: householdId });
+    mocks.create.mockRejectedValue(new HouseholdForbiddenError("Forbidden: private scope marker"));
+    const response = await createHousehold(jsonRequest("http://localhost:3000/api/chairman/households", "POST", {
+      newHouse: { number: "A-04" },
+      startsOn: "2026-10-03",
+      fullName: "Warga",
+      initialPin: "482913",
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toMatchObject({ message: "Pengelolaan rumah hanya tersedia untuk Ketua RT aktif." });
+    expect(body).not.toHaveProperty("code");
+    expect(JSON.stringify(body)).not.toContain("private scope marker");
   });
 });

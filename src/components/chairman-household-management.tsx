@@ -15,6 +15,7 @@ import {
   UserRoundPlus,
   UserRoundX,
 } from "lucide-react";
+import { householdConflictMessage, householdConflictMessageFromResponse } from "@/lib/households/conflicts";
 
 type HouseholdResident = {
   personId: string;
@@ -107,7 +108,7 @@ function rupiah(value: number) {
 function safeError(status: number, kind: "load" | "save") {
   if (status === 401) return "Sesi berakhir. Silakan masuk kembali untuk melanjutkan.";
   if (status === 403 || status === 404) return "Data atau akses untuk tindakan ini tidak tersedia.";
-  if (status === 409) return "Data berubah atau periode memiliki riwayat yang perlu dipertahankan. Muat ulang dan tinjau kembali.";
+  if (status === 409) return householdConflictMessage("GENERIC_CONFLICT");
   if (status === 400 || status === 415) return "Periksa kembali isian dan formatnya, lalu coba lagi.";
   return kind === "load"
     ? "Daftar rumah dan warga belum dapat dimuat. Silakan coba lagi."
@@ -125,7 +126,12 @@ async function sendJson<T>(url: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new Error(safeError(0, init?.method ? "save" : "load"));
   }
-  if (!response.ok) throw new Error(safeError(response.status, init?.method ? "save" : "load"));
+  if (!response.ok) {
+    if (response.status === 409) {
+      throw new Error(await householdConflictMessageFromResponse(response));
+    }
+    throw new Error(safeError(response.status, init?.method ? "save" : "load"));
+  }
   try {
     return await response.json() as T;
   } catch {
