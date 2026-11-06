@@ -4,10 +4,29 @@ CREATE OR REPLACE FUNCTION public.validate_fee_rate_phase11_insert_v1() RETURNS 
 LANGUAGE plpgsql AS $$
 DECLARE
   year_row public.billing_years%ROWTYPE;
+  batch_row public.sheet2_import_batches%ROWTYPE;
   local_year integer;
   local_month integer;
   chairman_count bigint;
 BEGIN
+  -- Preserve the separately authorized, audited 2026 Sheet2 bootstrap path.
+  -- Its deferred batch assertion verifies the System Admin MFA and full import contract.
+  IF NEW.sheet2_import_batch_id IS NOT NULL THEN
+    SELECT * INTO batch_row
+    FROM public.sheet2_import_batches batch
+    WHERE batch.id = NEW.sheet2_import_batch_id
+      AND batch.rt_unit_id = NEW.rt_unit_id
+      AND batch.billing_year_id = NEW.billing_year_id
+      AND batch.source_sheet = 'Sheet2';
+    IF NOT FOUND OR NEW.household_id IS NULL OR NEW.effective_month <> 1 OR
+       NEW.created_by_account_id IS NOT NULL OR NEW.created_by_account_type IS NOT NULL OR
+       NEW.idempotency_key IS NOT NULL OR NEW.request_fingerprint IS NOT NULL THEN
+      RAISE EXCEPTION 'Sheet2 tariff rows require a matching household-scoped import batch.'
+        USING ERRCODE = '23514', CONSTRAINT = 'fee_rate_sheet2_import_scope';
+    END IF;
+    RETURN NEW;
+  END IF;
+
   IF NEW.created_by_account_id IS NULL THEN
     RAISE EXCEPTION 'New tariff rows require Chairman attribution and idempotency metadata.'
       USING ERRCODE = '23514', CONSTRAINT = 'fee_rate_f11_actor_required';
