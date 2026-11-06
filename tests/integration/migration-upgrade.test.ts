@@ -138,7 +138,7 @@ describe("legacy billing migration upgrade", () => {
     expect(migrated).toEqual({ status: "not_due", waived_reason: null });
   });
 
-  it("applies the clean migration chain through 0015", async () => {
+  it("applies the clean migration chain through 0017", async () => {
     const cleanClient = new PGlite();
     try {
       const migrationFolder = resolve(process.cwd(), "drizzle");

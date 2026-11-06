@@ -32,7 +32,7 @@ const previewEnvironment = {
   DATABASE_ENV: "preview",
   KARTURT_PREVIEW_REKEY_SHA: "a".repeat(40),
   KARTURT_COMPILED_RELEASE_SHA: "a".repeat(40),
-  KARTURT_PREVIEW_TARGET_ID: "rough-queen-62552713/br-fragrant-poetry-aousu14b/ep-green-smoke-aobgfksu/karturt_preview",
+  KARTURT_PREVIEW_TARGET_ID: "quiet-credit-75135059/br-weathered-base-aodwvapx/ep-tiny-base-aocoa7m9/karturt_preview",
   KARTURT_PRODUCTION_TARGET_ID: "holy-term-22410117/br-jolly-bonus-azzd71cl/ep-empty-rain-azwe3eb3/karturt_production",
 } as NodeJS.ProcessEnv;
 
@@ -138,6 +138,6 @@ describe("Preview synthetic credential rekey", () => {
       replacementCredentials,
       previewEnvironment.KARTURT_COMPILED_RELEASE_SHA!,
       { ...previewEnvironment, KARTURT_PREVIEW_TARGET_ID: "other-preview-proj/br-preview-123456/ep-preview-123456/karturt_preview" },
-    )).rejects.toThrow("R3 business-date override is restricted to the approved Preview database target.");
+    )).rejects.toThrow("Preview synthetic credential rekey is restricted to the approved Preview database target.");
   });
 });

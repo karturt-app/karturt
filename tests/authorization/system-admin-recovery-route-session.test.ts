@@ -1280,7 +1280,7 @@ describe("System Admin recovery route cookie-session boundary", () => {
     expect(feeRatesResponse.status).toBe(200);
     expect((await invokeWithCookie(null, () => getChairmanFeeRates(request("/api/chairman/fee-rates")))).status).toBe(401);
 
-    const householdBody = { newHouse: { number: `matrix-${randomUUID().slice(0, 8)}` }, startsOn: "2026-10-04", fullName: "Matrix resident", initialPin: "123456" };
+    const householdBody = { newHouseMonthlyAmount: 40_000, newHouse: { number: `matrix-${randomUUID().slice(0, 8)}` }, startsOn: "2026-10-04", fullName: "Matrix resident", initialPin: "123456" };
     expect((await invokeWithCookie(null, () => createChairmanHousehold(request("/api/chairman/households", null, "POST", householdBody)))).status).toBe(401);
     expect((await invokeWithCookie(treasurer.cookie, () => createChairmanHousehold(request("/api/chairman/households", treasurer.cookie, "POST", householdBody)))).status).toBe(403);
 

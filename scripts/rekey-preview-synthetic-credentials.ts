@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { loadEnvConfig } from "@next/env";
-import { assertPreviewConnectionTarget, assertR3PreviewBusinessDateTarget } from "@/db/preview-target";
+import { assertPreviewConnectionTarget, assertPreviewSyntheticCredentialRekeyTarget } from "@/db/preview-target";
 import { getDb, closeDb } from "@/db/client";
 import { requireDatabaseEnvironment } from "@/lib/env";
 import {
@@ -37,7 +37,7 @@ async function main() {
   if (environment.appEnv !== "preview" || environment.databaseEnv !== "preview") {
     throw new Error("Preview rekey requires APP_ENV=preview and DATABASE_ENV=preview.");
   }
-  assertR3PreviewBusinessDateTarget(process.env);
+  assertPreviewSyntheticCredentialRekeyTarget(process.env);
   assertPreviewConnectionTarget(environment.databaseUrl, "runtime", process.env);
 
   const credentials: PreviewSyntheticRekeyCredentials = {

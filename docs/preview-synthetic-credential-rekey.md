@@ -2,6 +2,8 @@
 
 This one-shot utility rekeys only the four canonical `R2-SYNTH-01` Preview accounts. It changes their Better Auth password hashes, revokes their sessions, and adds one credential-free audit event per account. The audit records the approved CLI method and role, never a credential value. It does not create accounts, change account roles or lockout counters, alter business data, or connect with the migration role.
 
+The utility is pinned to the current Preview project, branch, endpoint, and database. Its credential-rekey allowlist is separate from the R3 business-date override target; changing this target requires source review and new exact-SHA approval.
+
 ## Owner steps after source review
 
 1. Wait for exact-head CI to pass on the PR head, then provide a separate GO naming that full SHA and the exact Preview project, branch, endpoint, and database. A CI pass or this document alone is not a GO.

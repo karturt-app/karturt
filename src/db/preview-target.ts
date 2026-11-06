@@ -13,6 +13,13 @@ export const r3PreviewBusinessDateTarget = {
   database: previewDatabaseTarget.database,
 } as const;
 
+export const previewSyntheticCredentialRekeyTarget = {
+  projectId: "quiet-credit-75135059",
+  branchId: "br-weathered-base-aodwvapx",
+  endpointId: "ep-tiny-base-aocoa7m9",
+  database: previewDatabaseTarget.database,
+} as const;
+
 export type PreviewTargetIdentity = {
   projectId: string;
   branchId: string;
@@ -72,6 +79,18 @@ export function assertR3PreviewBusinessDateTarget(environment: NodeJS.ProcessEnv
     target.database !== r3PreviewBusinessDateTarget.database
   ) {
     throw new Error("R3 business-date override is restricted to the approved Preview database target.");
+  }
+}
+
+export function assertPreviewSyntheticCredentialRekeyTarget(environment: NodeJS.ProcessEnv = process.env) {
+  const target = parsePreviewTargetIdentity(environment);
+  if (
+    target.projectId !== previewSyntheticCredentialRekeyTarget.projectId ||
+    target.branchId !== previewSyntheticCredentialRekeyTarget.branchId ||
+    target.endpointId !== previewSyntheticCredentialRekeyTarget.endpointId ||
+    target.database !== previewSyntheticCredentialRekeyTarget.database
+  ) {
+    throw new Error("Preview synthetic credential rekey is restricted to the approved Preview database target.");
   }
 }
 

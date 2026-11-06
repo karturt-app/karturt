@@ -125,7 +125,9 @@ jobs:
       github.ref == 'refs/heads/codex/sheet2-import-audit-20261027' ||
       github.head_ref == 'codex/sheet2-import-audit-20261027' ||
       github.ref == 'refs/heads/codex/v1-dependency-remediation-main-20261025' ||
-      github.head_ref == 'codex/v1-dependency-remediation-main-20261025'
+      github.head_ref == 'codex/v1-dependency-remediation-main-20261025' ||
+      github.ref == 'refs/heads/fix/chairman-new-household-tariff-20261106' ||
+      github.head_ref == 'fix/chairman-new-household-tariff-20261106'
     name: Launch Safety independent PostgreSQL concurrency
     needs: gate-a
     runs-on: ubuntu-latest
@@ -193,7 +195,9 @@ jobs:
       github.ref == 'refs/heads/codex/sheet2-import-audit-20261027' ||
       github.head_ref == 'codex/sheet2-import-audit-20261027' ||
       github.ref == 'refs/heads/codex/v1-dependency-remediation-main-20261025' ||
-      github.head_ref == 'codex/v1-dependency-remediation-main-20261025'
+      github.head_ref == 'codex/v1-dependency-remediation-main-20261025' ||
+      github.ref == 'refs/heads/fix/chairman-new-household-tariff-20261106' ||
+      github.head_ref == 'fix/chairman-new-household-tariff-20261106'
     name: R2 disposable PostgreSQL 18 recovery
     needs: gate-a
     runs-on: ubuntu-latest

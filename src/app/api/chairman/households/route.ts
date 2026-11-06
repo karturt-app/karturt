@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getDb } from "@/db/client";
 import { getCurrentPrincipal } from "@/lib/auth/principal";
+import { isNewHouseholdMonthlyFeeOption } from "@/lib/households/fee-options";
 import { jakartaBusinessDate } from "@/lib/officials/lifecycle";
 import {
   createHouseholdResident,
@@ -29,10 +30,13 @@ const newHouseSchema = z.object({
 const createSchema = z.object({
   houseId: uuidV4Schema.optional(),
   newHouse: newHouseSchema.optional(),
+  newHouseMonthlyAmount: z.number().int().optional(),
   startsOn: dateSchema,
   ...residentFields,
   initialPin: z.string().regex(/^\d{6}$/),
-}).strict().refine((value) => Boolean(value.houseId) !== Boolean(value.newHouse));
+}).strict()
+  .refine((value) => Boolean(value.houseId) !== Boolean(value.newHouse))
+  .refine((value) => value.newHouse ? isNewHouseholdMonthlyFeeOption(value.newHouseMonthlyAmount) : value.newHouseMonthlyAmount === undefined);
 
 export async function GET(request: Request) {
   try {
@@ -65,7 +69,7 @@ export async function POST(request: Request) {
   }
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
-    return householdJson({ message: "Periksa nama, nomor rumah, tanggal mulai, telepon, dan PIN enam digit." }, 400);
+    return householdJson({ message: "Periksa nama, nomor rumah, tarif, tanggal mulai, telepon, dan PIN enam digit." }, 400);
   }
 
   try {

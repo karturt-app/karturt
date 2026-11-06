@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/db/client";
 import {
@@ -25,6 +26,7 @@ import type { HouseholdConflictCode } from "@/lib/households/conflicts";
 import { canPerform, type Principal } from "@/lib/auth/permissions";
 import { getDueFinancialBalances } from "@/lib/billing/due-balance";
 import { buildAnnualDues } from "@/lib/billing/generator";
+import { isNewHouseholdMonthlyFeeOption } from "@/lib/households/fee-options";
 import { jakartaBusinessDate, officialAssignmentActiveOn } from "@/lib/officials/lifecycle";
 
 type LifecycleTransaction = Parameters<Parameters<AppDatabase["transaction"]>[0]>[0];
@@ -58,6 +60,7 @@ const HouseholdLifecycleConflictError = HouseholdConflictError;
 export interface CreateHouseholdResidentInput {
   houseId?: string;
   newHouse?: { number: string; label?: string | null };
+  newHouseMonthlyAmount?: number;
   startsOn: string;
   fullName: string;
   phone?: string | null;
@@ -154,6 +157,7 @@ type NormalizedCreateInput = {
   houseId: string | null;
   houseNumber: string | null;
   houseLabel: string | null;
+  newHouseMonthlyAmount: number | null;
   startsOn: string;
   fullName: string;
   phone: string | null;
@@ -272,7 +276,7 @@ function normalizeHouseNumber(value: unknown) {
 
 function normalizeCreateInput(input: CreateHouseholdResidentInput): NormalizedCreateInput {
   if (!isPlainObject(input)) throw new InvalidHouseholdLifecycleInputError("Data penghuni belum lengkap.");
-  rejectUnknownKeys(input, ["houseId", "newHouse", "startsOn", "fullName", "phone", "initialPin"]);
+  rejectUnknownKeys(input, ["houseId", "newHouse", "newHouseMonthlyAmount", "startsOn", "fullName", "phone", "initialPin"]);
   const hasHouseId = input.houseId !== undefined;
   const hasNewHouse = input.newHouse !== undefined;
   if (hasHouseId === hasNewHouse) {
@@ -281,9 +285,13 @@ function normalizeCreateInput(input: CreateHouseholdResidentInput): NormalizedCr
   let houseId: string | null = null;
   let houseNumber: string | null = null;
   let houseLabel: string | null = null;
+  let newHouseMonthlyAmount: number | null = null;
   if (hasHouseId) {
     if (typeof input.houseId !== "string" || !UUID_PATTERN.test(input.houseId)) {
       throw new InvalidHouseholdLifecycleInputError("Rumah yang dipilih belum valid.");
+    }
+    if (input.newHouseMonthlyAmount !== undefined) {
+      throw new InvalidHouseholdLifecycleInputError("Tarif khusus hanya dapat dipilih untuk nomor rumah baru.");
     }
     houseId = input.houseId;
   } else {
@@ -294,12 +302,16 @@ function normalizeCreateInput(input: CreateHouseholdResidentInput): NormalizedCr
     houseNumber = normalizeHouseNumber(input.newHouse.number);
     const label = normalizeNullableText(input.newHouse.label, "Label rumah", 120);
     houseLabel = label ?? null;
+    if (!isNewHouseholdMonthlyFeeOption(input.newHouseMonthlyAmount)) {
+      throw new InvalidHouseholdLifecycleInputError("Pilih tarif rumah baru dari pilihan yang tersedia.");
+    }
+    newHouseMonthlyAmount = input.newHouseMonthlyAmount;
   }
   const startsOn = canonicalDate(input.startsOn, "Tanggal mulai");
   const fullName = normalizeRequiredText(input.fullName, "Nama penghuni", 160);
   const phone = normalizePhone(input.phone) ?? null;
   const initialPin = normalizePin(input.initialPin);
-  return { houseId, houseNumber, houseLabel, startsOn, fullName, phone, initialPin };
+  return { houseId, houseNumber, houseLabel, newHouseMonthlyAmount, startsOn, fullName, phone, initialPin };
 }
 
 function assertPrincipalIsChairman(principal: Principal) {
@@ -473,9 +485,81 @@ async function assertNoCurrentLoginCollision(
   }
 }
 
+async function lockCurrentOpenBillingYearForNewHouse(
+  transaction: LifecycleTransaction,
+  input: { rtUnitId: string; startsOn: string; businessDate: string },
+) {
+  const openYears = await transaction
+    .select({ id: billingYears.id, year: billingYears.year })
+    .from(billingYears)
+    .where(and(eq(billingYears.rtUnitId, input.rtUnitId), eq(billingYears.status, "open")))
+    .orderBy(asc(billingYears.id))
+    .limit(2)
+    .for("update");
+  if (openYears.length === 0) {
+    throw new HouseholdLifecycleConflictError("Rumah baru memerlukan tahun tagihan berjalan yang masih terbuka.");
+  }
+  if (openYears.length !== 1) throw new HouseholdLifecycleInvariantError("RT memiliki lebih dari satu tahun tagihan terbuka.");
+  const year = openYears[0]!;
+  const businessYear = Number(input.businessDate.slice(0, 4));
+  if (
+    year.year !== businessYear ||
+    Number(input.startsOn.slice(0, 4)) !== year.year ||
+    input.startsOn.slice(0, 7) < input.businessDate.slice(0, 7)
+  ) {
+    throw new HouseholdLifecycleConflictError("Tarif rumah baru hanya dapat dibuat untuk bulan masuk pada tahun tagihan berjalan yang terbuka.");
+  }
+  return year;
+}
+
+async function insertNewHouseholdFeeRate(
+  transaction: LifecycleTransaction,
+  input: {
+    rtUnitId: string;
+    householdId: string;
+    billingYearId: string;
+    billingYear: number;
+    effectiveMonth: number;
+    monthlyAmount: number;
+    actorAppAccountId: string;
+  },
+) {
+  const requestFingerprint = createHash("sha256").update(JSON.stringify({
+    version: 1,
+    billingYearId: input.billingYearId,
+    householdId: input.householdId,
+    effectiveMonth: input.effectiveMonth,
+    monthlyAmount: input.monthlyAmount,
+  })).digest("hex");
+  const [created] = await transaction.insert(feeRates).values({
+    rtUnitId: input.rtUnitId,
+    billingYearId: input.billingYearId,
+    householdId: input.householdId,
+    effectiveMonth: input.effectiveMonth,
+    monthlyAmount: input.monthlyAmount,
+    createdByAccountId: input.actorAppAccountId,
+    createdByAccountType: "official",
+    idempotencyKey: randomUUID(),
+    requestFingerprint,
+  }).returning({ id: feeRates.id });
+  if (!created) throw new HouseholdLifecycleInvariantError("Tarif khusus rumah baru tidak dapat dibuat.");
+
+  await appendAuditEvent(transaction, {
+    actorAppAccountId: input.actorAppAccountId,
+    action: "fee_rate.created",
+    entityType: "fee_rate",
+    entityId: created.id,
+    reason: null,
+    context: {
+      period: `${input.billingYear}-${String(input.effectiveMonth).padStart(2, "0")}`,
+      monthlyAmount: input.monthlyAmount,
+    },
+  });
+}
+
 async function addOpenYearDues(
   transaction: LifecycleTransaction,
-  input: { rtUnitId: string; householdId: string; startsOn: string; endsOn?: string | null },
+  input: { rtUnitId: string; householdId: string; startsOn: string; endsOn?: string | null; expectedBillingYearId?: string },
 ): Promise<number> {
   const openYears = await transaction
     .select({ id: billingYears.id, year: billingYears.year })
@@ -487,6 +571,9 @@ async function addOpenYearDues(
   if (openYears.length === 0) return 0;
   if (openYears.length !== 1) throw new HouseholdLifecycleInvariantError("RT memiliki lebih dari satu tahun tagihan terbuka.");
   const year = openYears[0]!;
+  if (input.expectedBillingYearId && year.id !== input.expectedBillingYearId) {
+    throw new HouseholdLifecycleConflictError("Tahun tagihan berubah sebelum tagihan rumah baru dibuat. Muat ulang lalu coba kembali.");
+  }
   const [settings] = await transaction
     .select({ dueDay: rtSettings.dueDay })
     .from(rtSettings)
@@ -656,6 +743,13 @@ async function translateLifecycleConstraint<T>(operation: () => Promise<T>): Pro
   try {
     return await operation();
   } catch (error) {
+    const dbError = findPostgresConstraintError(error);
+    if (dbError?.code === "23514" && dbError.constraint === "fee_rate_future_period_required") {
+      throw new HouseholdLifecycleConflictError(
+        "Periode tarif berubah sebelum rumah dibuat. Muat ulang lalu coba kembali.",
+        "GENERIC_CONFLICT",
+      );
+    }
     const code = householdConflictCodeForPostgresError(error);
     if (code) {
       throw new HouseholdLifecycleConflictError("Data rumah bertentangan dengan catatan yang ada.", code);
@@ -677,6 +771,14 @@ export async function createHouseholdResident(
   const rtUnitId = principal.rtUnitId!;
 
   return translateLifecycleConstraint(() => database.transaction(async (transaction) => {
+    await assertActiveChairman(transaction, principal, date);
+    const newHouseBillingYear = normalized.houseId === null
+      ? await lockCurrentOpenBillingYearForNewHouse(transaction, {
+        rtUnitId,
+        startsOn: normalized.startsOn,
+        businessDate: date,
+      })
+      : null;
     let houseId = normalized.houseId;
     if (houseId === null) {
       const canonicalHouseNumber = normalized.houseNumber!;
@@ -711,7 +813,6 @@ export async function createHouseholdResident(
       rtUnitId,
       existingHouseholds.map((household) => household.id),
     );
-    await assertActiveChairman(transaction, principal, date);
 
     const loginIdentifier = house.number.trim().toUpperCase();
     await assertNoCurrentLoginCollision(transaction, loginIdentifier);
@@ -741,11 +842,26 @@ export async function createHouseholdResident(
       fullName: normalized.fullName,
       pin: normalized.initialPin,
     });
+    if (newHouseBillingYear) {
+      if (normalized.newHouseMonthlyAmount === null) {
+        throw new HouseholdLifecycleInvariantError("Tarif rumah baru belum dipilih setelah validasi.");
+      }
+      await insertNewHouseholdFeeRate(transaction, {
+        rtUnitId,
+        householdId: createdHousehold.id,
+        billingYearId: newHouseBillingYear.id,
+        billingYear: newHouseBillingYear.year,
+        effectiveMonth: Number(normalized.startsOn.slice(5, 7)),
+        monthlyAmount: normalized.newHouseMonthlyAmount,
+        actorAppAccountId: principal.appAccountId,
+      });
+    }
     const generatedDueCount = await addOpenYearDues(transaction, {
       rtUnitId,
       householdId: createdHousehold.id,
       startsOn: normalized.startsOn,
       endsOn: null,
+      expectedBillingYearId: newHouseBillingYear?.id,
     });
 
     await appendAuditEvent(transaction, {
