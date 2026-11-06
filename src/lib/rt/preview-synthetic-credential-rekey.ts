@@ -2,7 +2,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, count, eq, getTableName, inArray, sql } from "drizzle-orm";
 import type { AnyPgTable } from "drizzle-orm/pg-core";
 import type { AppDatabase } from "@/db/client";
-import { assertR3PreviewBusinessDateTarget } from "@/db/preview-target";
+import { assertPreviewSyntheticCredentialRekeyTarget } from "@/db/preview-target";
 import {
   appAccounts,
   authAccount,
@@ -61,7 +61,7 @@ function assertPreviewRekeyEnvironment(releaseSha: string, environment: NodeJS.P
   if (environment.APP_ENV !== "preview" || environment.DATABASE_ENV !== "preview") {
     throw new Error("Synthetic credential rekey is restricted to an explicitly labeled Preview environment.");
   }
-  assertR3PreviewBusinessDateTarget(environment);
+  assertPreviewSyntheticCredentialRekeyTarget(environment);
   if (!/^[0-9a-f]{40}$/.test(releaseSha) || environment.KARTURT_PREVIEW_REKEY_SHA !== releaseSha) {
     throw new Error("Preview synthetic rekey must name the exact checked-out release SHA.");
   }
