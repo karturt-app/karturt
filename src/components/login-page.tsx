@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2, LockKeyhole, ShieldCheck } from "lucide-react"
 import { Brand } from "@/components/brand";
 import { LoginForm, type LoginKind } from "@/components/login-form";
 import { OfficialPinRecoveryForm } from "@/components/official-pin-recovery-form";
+import { SessionCheckNotice } from "@/components/session-check-notice";
 import { SiteFooter } from "@/components/site-footer";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { OWNER_RECOVERY_ORIGIN } from "@/lib/auth/owner-recovery-origin";
@@ -28,7 +29,13 @@ const details: Record<LoginKind, { title: string; eyebrow: string; description: 
   },
 };
 
-export function LoginPage({ kind }: { kind: LoginKind }) {
+const retryPaths: Record<LoginKind, string> = {
+  resident: "/login/warga",
+  official: "/login/pengurus",
+  system_admin: "/system/login",
+};
+
+export function LoginPage({ kind, sessionCheckUnavailable = false }: { kind: LoginKind; sessionCheckUnavailable?: boolean }) {
   const item = details[kind];
   const Icon = item.icon;
 
@@ -53,30 +60,34 @@ export function LoginPage({ kind }: { kind: LoginKind }) {
           <p className="eyebrow"><Icon size={16} aria-hidden="true" />{item.eyebrow}</p>
           <h1 id="login-title">{item.title}</h1>
           <p className="intro-copy">{item.description}</p>
-          <div className="trust-note">
+          {!sessionCheckUnavailable && <div className="trust-note">
             <span className="trust-dot" aria-hidden="true" />
             <span>Masuk aman dengan sesi pribadi</span>
-          </div>
+          </div>}
         </div>
 
-        <div className="login-card">
-          <div className="login-card-heading">
-            <div>
-              <span className="step-label">AKUN KARTURT</span>
-              <h2>Silakan masuk</h2>
+        {sessionCheckUnavailable ? (
+          <SessionCheckNotice retryHref={retryPaths[kind]} />
+        ) : (
+          <div className="login-card">
+            <div className="login-card-heading">
+              <div>
+                <span className="step-label">AKUN KARTURT</span>
+                <h2>Silakan masuk</h2>
+              </div>
+              <span className="card-seal" aria-hidden="true"><LockKeyhole size={18} /></span>
             </div>
-            <span className="card-seal" aria-hidden="true"><LockKeyhole size={18} /></span>
+            <LoginForm kind={kind} />
+            {kind === "resident" && <p className="help-line">Lupa PIN? Hubungi pengurus RT untuk bantuan.</p>}
+            {kind === "official" && <OfficialPinRecoveryForm />}
+            {kind === "system_admin" && (
+              <>
+                <p className="help-line">System Admin tidak dapat memverifikasi atau mencatat pembayaran.</p>
+                <p className="help-line">Tidak dapat memakai autentikator? <a href={`${OWNER_RECOVERY_ORIGIN}/system/recovery`}>Buka pemulihan pemilik melalui Vercel</a>.</p>
+              </>
+            )}
           </div>
-          <LoginForm kind={kind} />
-          {kind === "resident" && <p className="help-line">Lupa PIN? Hubungi pengurus RT untuk bantuan.</p>}
-          {kind === "official" && <OfficialPinRecoveryForm />}
-          {kind === "system_admin" && (
-            <>
-              <p className="help-line">System Admin tidak dapat memverifikasi atau mencatat pembayaran.</p>
-              <p className="help-line">Tidak dapat memakai autentikator? <a href={`${OWNER_RECOVERY_ORIGIN}/system/recovery`}>Buka pemulihan pemilik melalui Vercel</a>.</p>
-            </>
-          )}
-        </div>
+        )}
       </section>
 
       {kind !== "system_admin" && (

@@ -175,6 +175,10 @@ button { color: inherit; }
 .entry-arrow { color: var(--muted); transition: transform 180ms ease, color 180ms ease; }
 .entry-link:hover .entry-arrow { transform: translate(2px,-2px); color: var(--teal); }
 .entry-help { margin: 18px 0 0; color: var(--muted); font-size: 13px; }
+.session-check-notice { min-width: 0; padding: 16px; display: grid; gap: 13px; border: 1px solid #ead79b; border-left: 4px solid #c19a24; border-radius: 12px; color: var(--ink); background: #fff9e3; }
+.session-check-notice h2 { margin: 0; font-family: var(--font-display); font-size: 20px; line-height: 1.25; font-weight: 750; }
+.session-check-notice p { margin: 5px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.dark .session-check-notice { border-color: #78652e; border-left-color: #d4b654; background: #302b1b; }
 
 .home-note { margin: auto 0 46px; padding: 24px 0; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 25px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .home-note > div { display: flex; align-items: flex-start; gap: 13px; }

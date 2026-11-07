@@ -3,7 +3,10 @@ import Link from "next/link";
 import { ArrowUpRight, House, UsersRound } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
+import { SessionCheckNotice } from "@/components/session-check-notice";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { redirect } from "next/navigation";
+import { resolveSessionEntry } from "@/lib/auth/session-entry";
 
 export const metadata: Metadata = {
   title: "Administrasi iuran RT yang lebih jelas",
@@ -11,12 +14,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
+export const dynamic = "force-dynamic";
+
 const entryPoints = [
   { href: "/login/warga", icon: House, title: "Saya warga", description: "Lihat kartu iuran dan informasi akun warga." },
   { href: "/login/pengurus", icon: UsersRound, title: "Saya pengurus", description: "Masuk dengan akun Bendahara atau Ketua RT." },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const sessionEntry = await resolveSessionEntry();
+  if (sessionEntry.kind === "redirect") redirect(sessionEntry.destination);
+
   return (
     <main className="page-shell home-shell">
       <header className="topbar">
@@ -25,6 +33,8 @@ export default function Home() {
           <ThemeToggle />
         </div>
       </header>
+
+      {sessionEntry.kind === "unavailable" && <SessionCheckNotice retryHref="/" />}
 
       <section className="home-hero" aria-labelledby="home-title">
         <div className="hero-copy">

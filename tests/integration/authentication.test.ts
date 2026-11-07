@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { base32 } from "@better-auth/utils/base32";
 import { hashPassword } from "better-auth/crypto";
 import type { AppDatabase } from "../../src/db/client";
-import { appAccounts, authAccount, authTwoFactor, authUser, households, officialAssignments, people } from "../../src/db/schema";
+import { appAccounts, authAccount, authSession, authTwoFactor, authUser, households, officialAssignments, people } from "../../src/db/schema";
 import { createAuth } from "../../src/lib/auth/server";
 import { findUniqueLoginAccount } from "../../src/lib/auth/login-account";
 import { MfaEnrollmentRequiredError, resolvePrincipalForUser, UnauthenticatedError } from "../../src/lib/auth/principal";
@@ -79,6 +79,49 @@ describe("authentication and account-role integration", () => {
     expect(record?.accounts).toHaveLength(1);
     expect(record?.accounts[0]).toMatchObject({ accountId: user.id, providerId: "credential" });
     expect(record?.accounts[0]?.password).toBeTruthy();
+  });
+
+  it("recognizes a live Better Auth session and returns no session after its expiry", async () => {
+    const { db } = testDatabase;
+    const rtUnitId = await createRt(db);
+    const household = await createHousehold(db, rtUnitId, { number: "S-01" });
+    const resident = await createAuthUser(db, "Synthetic session fixture");
+    const password = "synthetic-session-password";
+    await db.insert(authAccount).values({
+      id: randomUUID(),
+      accountId: resident.id,
+      providerId: "credential",
+      userId: resident.id,
+      password: await hashPassword(password),
+    });
+    await db.insert(appAccounts).values({
+      rtUnitId,
+      authUserId: resident.id,
+      accountType: "resident",
+      loginIdentifier: "S-01",
+      personId: household.personId,
+      householdId: household.householdId,
+    });
+
+    const auth = createAuth(db as unknown as AppDatabase, {
+      secret: "test-only-secret-with-at-least-32-characters",
+      baseURL: "http://localhost:3000",
+    });
+    const signIn = await auth.handler(new Request("http://localhost:3000/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+      body: JSON.stringify({ email: resident.email, password, rememberMe: false }),
+    }));
+    expect(signIn.status).toBe(200);
+    const cookie = signIn.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
+    const liveSession = await auth.api.getSession({ headers: new Headers({ cookie }) });
+    expect(liveSession?.user.id).toBe(resident.id);
+    await expect(resolvePrincipalForUser(db as unknown as AppDatabase, resident.id)).resolves.toMatchObject({ role: "resident" });
+
+    await db.update(authSession)
+      .set({ expiresAt: new Date("2020-01-01T00:00:00.000Z") })
+      .where(eq(authSession.id, liveSession!.session.id));
+    await expect(auth.api.getSession({ headers: new Headers({ cookie }) })).resolves.toBeNull();
   });
 
   it("holds System Admin outside the app until a TOTP factor is verified", async () => {
