@@ -34,6 +34,7 @@ const routes = [
   { path: "/login/pengurus", render: OfficialLoginPage },
   { path: "/system/login", render: SystemAdminLoginPage },
 ];
+const entryPaths = routes.map(({ path }) => path);
 
 function findElement(node: ReactNode, predicate: (element: ReactElement) => boolean): ReactElement | null {
   if (Array.isArray(node)) {
@@ -63,6 +64,7 @@ describe("public session entry authorization", () => {
       for (const route of routes) {
         mocks.getCurrentPrincipal.mockResolvedValue({ role });
         await expect(route.render()).rejects.toThrow("NEXT_REDIRECT:/app");
+        expect(entryPaths).not.toContain("/app");
       }
     },
   );
@@ -83,6 +85,7 @@ describe("public session entry authorization", () => {
   it.each(routes)("sends $path to the protected MFA setup when enrollment is incomplete", async (route) => {
     mocks.getCurrentPrincipal.mockRejectedValue(new MfaEnrollmentRequiredError());
     await expect(route.render()).rejects.toThrow("NEXT_REDIRECT:/system/2fa/setup");
+    expect(entryPaths).not.toContain("/system/2fa/setup");
   });
 
   it.each(routes)("shows a safe retry fallback on $path when the database cannot verify a session", async (route) => {
