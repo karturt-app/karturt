@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowUpRight, House, UsersRound } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const metadata: Metadata = {
   title: "Administrasi iuran RT yang lebih jelas",
@@ -20,6 +21,9 @@ export default function Home() {
     <main className="page-shell home-shell">
       <header className="topbar">
         <Brand />
+        <div className="topbar-actions">
+          <ThemeToggle />
+        </div>
       </header>
 
       <section className="home-hero" aria-labelledby="home-title">

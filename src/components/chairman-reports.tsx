@@ -650,6 +650,21 @@ export function ChairmanReports({
                 <h2 id="chairman-report-summary-title">Ringkasan tahunan</h2>
               </div>
             </div>
+            {data.yearly.effectiveTarget > 0 && (() => {
+              const realizedTotal = data.yearly.received + data.yearly.openingBalanceReceived + data.yearly.waived;
+              const pct = Math.min(100, Math.round((realizedTotal / data.yearly.effectiveTarget) * 100));
+              return (
+                <div className="report-collection-progress" aria-label={`Realisasi kas tahun ${data.year}`}>
+                  <div className="report-collection-meta">
+                    <span>Realisasi terhadap target efektif</span>
+                    <strong>{pct}%</strong>
+                  </div>
+                  <div className="report-collection-track" aria-hidden="true">
+                    <span className="report-collection-fill" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })()}
             <dl className="chairman-report-metrics">
               <Metric label="Target awal" amount={data.yearly.target} />
               <Metric label="Target efektif" amount={data.yearly.effectiveTarget} />

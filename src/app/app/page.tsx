@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { TreasurerDashboard } from "@/components/treasurer-dashboard";
 import Link from "next/link";
 import { getDb } from "@/db/client";
@@ -53,17 +54,20 @@ export default async function AccountHomePage() {
     <main className="page-shell">
       <header className="topbar">
         <Brand compact />
-        <SignOutButton />
+        <div className="topbar-actions">
+          <ThemeToggle />
+          <details className="account-tools">
+            <summary>Pengaturan akun</summary>
+            <nav className="account-tools-links" aria-label="Pengaturan akun">
+              {(principal.role === "rt_chairman" || principal.role === "system_admin") && (
+                <Link href="/app/aktivitas">Riwayat aktivitas</Link>
+              )}
+              <Link href="/app/keamanan">Keamanan akun</Link>
+            </nav>
+          </details>
+          <SignOutButton />
+        </div>
       </header>
-      <details className="account-tools">
-        <summary>Pengaturan akun</summary>
-        <nav className="account-tools-links" aria-label="Pengaturan akun">
-          {(principal.role === "rt_chairman" || principal.role === "system_admin") && (
-            <Link href="/app/aktivitas">Riwayat aktivitas</Link>
-          )}
-          <Link href="/app/keamanan">Keamanan akun</Link>
-        </nav>
-      </details>
       {profile ? (
         <>
           <PaymentNotifications accountId={principal.appAccountId} role="resident" />

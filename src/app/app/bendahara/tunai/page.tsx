@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Brand } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { TreasurerCashPaymentFlow } from "@/components/treasurer-cash-payment-flow";
 import { getDb } from "@/db/client";
 import { getCurrentPrincipal, MfaEnrollmentRequiredError, UnauthenticatedError } from "@/lib/auth/principal";
@@ -39,7 +40,10 @@ export default async function TreasurerCashPaymentPage() {
     <main className="page-shell">
       <header className="topbar">
         <Brand compact />
-        <SignOutButton />
+        <div className="topbar-actions">
+          <ThemeToggle />
+          <SignOutButton />
+        </div>
       </header>
       <nav className="breadcrumb" aria-label="Jejak halaman">
         <Link href="/app">Ruang Bendahara</Link>

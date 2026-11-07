@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SiteFooter } from "@/components/site-footer";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { OfficialManagement } from "@/components/official-management";
 import { getDb } from "@/db/client";
 import { getCurrentPrincipal, MfaEnrollmentRequiredError, UnauthenticatedError } from "@/lib/auth/principal";
@@ -20,7 +21,7 @@ export default async function OfficialsPage() {
     throw error;
   }
   if (!principal.rtUnitId || !canPerform(principal, "official:manage", { rtUnitId: principal.rtUnitId })) notFound();
-  return <main className="page-shell"><header className="topbar"><Brand compact /><SignOutButton /></header>
+  return <main className="page-shell"><header className="topbar"><Brand compact /><div className="topbar-actions"><ThemeToggle /><SignOutButton /></div></header>
     <nav className="breadcrumb" aria-label="Jejak halaman"><Link href="/app">Kembali ke ruang akun</Link><span>/</span><span>Jabatan pengurus</span></nav>
     <OfficialManagement initial={await listOfficials(getDb(), principal)} /><SiteFooter /></main>;
 }

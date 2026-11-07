@@ -667,6 +667,9 @@ export function ResidentCard({
   const selected = dues.filter((d) => d.billingYear === year);
   const summary = duesSummary(selected);
   const months = yearMonths(dues, year);
+  const paidMonthsCount = selected.filter((d) => d.status === "paid" || d.status === "waived").length;
+  const activeMonthsCount = selected.filter((d) => d.status !== "not_due").length;
+  const progressPercent = activeMonthsCount > 0 ? Math.min(100, Math.round((paidMonthsCount / activeMonthsCount) * 100)) : 0;
   const currentMonth = year === Number(businessDate.slice(0, 4))
     ? months.find(({ month }) => month === Number(businessDate.slice(5, 7)))
     : undefined;
@@ -747,6 +750,17 @@ export function ResidentCard({
           </label>
           {tab === "card" ? (
             <>
+              {activeMonthsCount > 0 && (
+                <div className="resident-progress-bar" aria-label={`Progres pelunasan ${year}`}>
+                  <div className="resident-progress-meta">
+                    <span>Progres iuran {year}</span>
+                    <strong>{paidMonthsCount} / {activeMonthsCount} bulan ({progressPercent}%)</strong>
+                  </div>
+                  <div className="resident-progress-track" aria-hidden="true">
+                    <span className="resident-progress-fill" style={{ width: `${progressPercent}%` }} />
+                  </div>
+                </div>
+              )}
               <ResidentDuesSummary summary={summary} />
               {currentMonth && (
                 <section className="resident-current-month" aria-label="Iuran bulan berjalan">

@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2, Clock3, Home } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { TreasurerVerificationButton } from "@/components/treasurer-verification-button";
 import { TreasurerRejectionForm } from "@/components/treasurer-rejection-form";
 import { TreasurerResolutionCoordinator } from "@/components/treasurer-resolution-coordinator";
@@ -68,7 +69,10 @@ export default async function TreasurerPaymentRequestDetailPage({
     <main className="page-shell">
       <header className="topbar">
         <Brand compact />
-        <SignOutButton />
+        <div className="topbar-actions">
+          <ThemeToggle />
+          <SignOutButton />
+        </div>
       </header>
       <nav className="breadcrumb" aria-label="Jejak halaman">
         <Link href="/app">Antrean Bendahara</Link>
