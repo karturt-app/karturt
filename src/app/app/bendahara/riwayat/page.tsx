@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SiteFooter } from "@/components/site-footer";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { TreasurerPaymentHistory } from "@/components/treasurer-payment-history";
 import { getDb } from "@/db/client";
 import { getTreasurerPaymentHistory } from "@/lib/billing/payment-history";
@@ -32,7 +33,10 @@ export default async function TreasurerPaymentHistoryPage() {
     <main className="page-shell">
       <header className="topbar">
         <Brand compact />
-        <SignOutButton />
+        <div className="topbar-actions">
+          <ThemeToggle />
+          <SignOutButton />
+        </div>
       </header>
       <TreasurerPaymentHistory initialPage={initialPage} />
       <SiteFooter />

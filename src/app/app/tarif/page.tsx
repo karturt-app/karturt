@@ -5,6 +5,7 @@ import { Brand } from "@/components/brand";
 import { ChairmanFeeRatesFlow } from "@/components/chairman-fee-rates-flow";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SiteFooter } from "@/components/site-footer";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { canPerform } from "@/lib/auth/permissions";
 import {
   getCurrentPrincipal,
@@ -42,7 +43,10 @@ export default async function ChairmanFeeRatesPage() {
     <main className="page-shell">
       <header className="topbar">
         <Brand compact />
-        <SignOutButton />
+        <div className="topbar-actions">
+          <ThemeToggle />
+          <SignOutButton />
+        </div>
       </header>
       <nav className="breadcrumb" aria-label="Jejak halaman">
         <Link href="/app">Ruang akun</Link>

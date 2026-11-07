@@ -4,6 +4,7 @@ import { Brand } from "@/components/brand";
 import { LoginForm, type LoginKind } from "@/components/login-form";
 import { OfficialPinRecoveryForm } from "@/components/official-pin-recovery-form";
 import { SiteFooter } from "@/components/site-footer";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { OWNER_RECOVERY_ORIGIN } from "@/lib/auth/owner-recovery-origin";
 
 const details: Record<LoginKind, { title: string; eyebrow: string; description: string; icon: typeof CheckCircle2 }> = {
@@ -35,9 +36,12 @@ export function LoginPage({ kind }: { kind: LoginKind }) {
     <main className="page-shell login-shell">
       <header className="topbar">
         <Brand compact />
-        <Link className="back-link" href="/">
-          <ArrowLeft size={17} aria-hidden="true" /> Beranda
-        </Link>
+        <div className="topbar-actions">
+          <ThemeToggle />
+          <Link className="back-link" href="/">
+            <ArrowLeft size={17} aria-hidden="true" /> Beranda
+          </Link>
+        </div>
       </header>
 
       <nav className="breadcrumb" aria-label="Breadcrumb">

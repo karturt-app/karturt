@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SiteFooter } from "@/components/site-footer";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getDb } from "@/db/client";
 import { canPerform } from "@/lib/auth/permissions";
 import { getCurrentPrincipal, MfaEnrollmentRequiredError, UnauthenticatedError } from "@/lib/auth/principal";
@@ -37,7 +38,7 @@ export default async function ActivityPage({ searchParams }: {
     timeZone: "Asia/Jakarta", dateStyle: "medium", timeStyle: "short",
   }).format(new Date(time));
   return <main className="page-shell">
-    <header className="topbar"><Brand compact /><SignOutButton /></header>
+    <header className="topbar"><Brand compact /><div className="topbar-actions"><ThemeToggle /><SignOutButton /></div></header>
     <nav className="breadcrumb" aria-label="Jejak halaman"><Link href="/app"><ArrowLeft size={16} aria-hidden="true" />Kembali ke ruang akun</Link><span>/</span><span>Aktivitas</span></nav>
     <section className="app-card audit-area">
       <h1>Riwayat aktivitas</h1>

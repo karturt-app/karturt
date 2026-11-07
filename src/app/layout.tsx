@@ -1,6 +1,25 @@
 import type { Metadata, Viewport } from "next";
+import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { getPublicAppUrl } from "@/lib/env";
 import "./globals.css";
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 const appUrl = getPublicAppUrl();
 const themeBootstrap = `(()=>{let theme="light";try{const stored=localStorage.getItem("karturt:theme");if(stored==="dark")theme="dark"}catch{}document.documentElement.dataset.theme=theme;document.documentElement.classList.toggle("dark",theme==="dark")})()`;
@@ -47,7 +66,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="id" className="antialiased" suppressHydrationWarning>
+    <html lang="id" className={`${plusJakarta.variable} ${fraunces.variable} ${jetbrainsMono.variable} antialiased`} suppressHydrationWarning>
       <head>
         <script id="karturt-theme-bootstrap" dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData).replace(/</g, "\\u003c") }} />

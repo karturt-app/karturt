@@ -9,6 +9,7 @@ import { Brand } from "@/components/brand";
 import { ChairmanReports } from "@/components/chairman-reports";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SiteFooter } from "@/components/site-footer";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { canPerform } from "@/lib/auth/permissions";
 import {
   getCurrentPrincipal,
@@ -77,7 +78,10 @@ export default async function ChairmanReportsPage({ searchParams }: ChairmanRepo
     <main className="page-shell chairman-reports-page">
       <header className="topbar">
         <Brand compact />
-        <SignOutButton />
+        <div className="topbar-actions">
+          <ThemeToggle />
+          <SignOutButton />
+        </div>
       </header>
       <nav className="breadcrumb" aria-label="Jejak halaman">
         <Link href="/app"><ArrowLeft size={16} aria-hidden="true" />Kembali ke ruang akun</Link>

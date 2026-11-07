@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { ChangeAccountPinForm } from "@/components/change-account-pin-form";
 import { getDb } from "@/db/client";
 import { appAccounts } from "@/db/schema";
@@ -42,7 +43,10 @@ export default async function AccountSecurityPage() {
     <main className="page-shell">
       <header className="topbar">
         <Brand compact />
-        <Link className="back-link" href="/app"><ArrowLeft size={17} aria-hidden="true" /> Kembali</Link>
+        <div className="topbar-actions">
+          <ThemeToggle />
+          <Link className="back-link" href="/app"><ArrowLeft size={17} aria-hidden="true" /> Kembali</Link>
+        </div>
       </header>
       <nav className="breadcrumb" aria-label="Breadcrumb">
         <Link href="/">Beranda</Link><span aria-hidden="true">/</span>
