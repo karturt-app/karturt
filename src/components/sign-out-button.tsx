@@ -23,19 +23,21 @@ export function SignOutButton() {
     }
   }
   return (
-    <div>
+    <div className="sign-out-wrap">
       <button
-        className="button"
+        className="icon-button sign-out-button"
         type="button"
         onClick={signOut}
         disabled={busy}
+        title="Keluar dari akun"
+        aria-label="Keluar dari akun"
       >
         {busy ? (
-          <LoaderCircle className="spinner" size={17} />
+          <LoaderCircle className="spinner" size={16} />
         ) : (
-          <LogOut size={17} aria-hidden="true" />
+          <LogOut size={16} aria-hidden="true" />
         )}
-        Keluar
+        <span className="sign-out-label">Keluar</span>
       </button>
       {error && (
         <p className="resident-note" role="alert">
