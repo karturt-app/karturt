@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { AtmosphereBackdrop } from "@/components/atmosphere-backdrop";
 import { getPublicAppUrl } from "@/lib/env";
 import "./globals.css";
 
@@ -22,7 +23,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 const appUrl = getPublicAppUrl();
-const themeBootstrap = `(()=>{let theme="light";try{const stored=localStorage.getItem("karturt:theme");if(stored==="dark")theme="dark"}catch{}document.documentElement.dataset.theme=theme;document.documentElement.classList.toggle("dark",theme==="dark")})()`;
+const themeBootstrap = `(()=>{const h=new Date(Date.now()+252e5).getUTCHours();let a=h>=4&&h<=8?"morning":h>=9&&h<=14?"day":h>=15&&h<=18?"afternoon":"night";try{const m=localStorage.getItem("karturt:atmosphere-mode");if(m==="morning"||m==="day"||m==="afternoon"||m==="night"||m==="rain")a=m}catch{}const d=a==="night"||a==="rain";const e=document.documentElement;e.dataset.theme=d?"dark":"light";e.dataset.atmosphere=a;e.classList.toggle("dark",d);e.classList.toggle("rain",a==="rain");e.classList.toggle("morning",a==="morning");e.classList.toggle("afternoon",a==="afternoon");e.style.colorScheme=d?"dark":"light"})()`;
 const organizationData = {
   "@context": "https://schema.org",
   "@type": "Organization",
@@ -71,7 +72,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script id="karturt-theme-bootstrap" dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData).replace(/</g, "\\u003c") }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <AtmosphereBackdrop />
+        {children}
+      </body>
     </html>
   );
 }

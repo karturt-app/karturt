@@ -1,48 +1,95 @@
 "use client";
 
-import { Moon, Sun } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { CloudRain, Moon, Sparkles, Sun, Sunrise, Sunset } from "lucide-react";
+import {
+  RT05_LOCATION,
+  cycleWeatherMode,
+  useAtmosphere,
+  useWeatherSync,
+  type Atmosphere,
+} from "@/lib/atmosphere";
 
-type Theme = "light" | "dark";
-
-function applyTheme(theme: Theme, persist: boolean) {
-  document.documentElement.dataset.theme = theme;
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  if (persist) {
-    try {
-      window.localStorage.setItem("karturt:theme", theme);
-    } catch {
-      // The selected theme still applies for this page even when storage is unavailable.
-    }
-  }
-  window.dispatchEvent(new Event("karturt:theme-change"));
-}
-
-function subscribe(callback: () => void) {
-  window.addEventListener("karturt:theme-change", callback);
-  return () => window.removeEventListener("karturt:theme-change", callback);
-}
-
-function getThemeSnapshot(): Theme {
-  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-}
-
-function getServerThemeSnapshot(): Theme {
-  return "light";
-}
+const ATMOSPHERE_META: Record<
+  Atmosphere,
+  { label: string; icon: typeof Sun; toneClass: string }
+> = {
+  morning: {
+    label: "Pagi",
+    icon: Sunrise,
+    toneClass: "theme-toggle-icon--morning",
+  },
+  day: {
+    label: "Siang",
+    icon: Sun,
+    toneClass: "theme-toggle-icon--day",
+  },
+  afternoon: {
+    label: "Sore",
+    icon: Sunset,
+    toneClass: "theme-toggle-icon--afternoon",
+  },
+  night: {
+    label: "Malam",
+    icon: Moon,
+    toneClass: "theme-toggle-icon--night",
+  },
+  rain: {
+    label: "Hujan",
+    icon: CloudRain,
+    toneClass: "theme-toggle-icon--rain",
+  },
+};
 
 export function ThemeToggle() {
-  const theme = useSyncExternalStore(subscribe, getThemeSnapshot, getServerThemeSnapshot);
+  useWeatherSync();
 
-  function toggleTheme() {
-    const next = theme === "light" ? "dark" : "light";
-    applyTheme(next, true);
+  const { atmosphere, weatherMode, liveWeather } = useAtmosphere();
+  const currentMeta = ATMOSPHERE_META[atmosphere] ?? ATMOSPHERE_META.day;
+  const Icon = currentMeta.icon;
+  const isAuto = weatherMode === "auto";
+
+  const tempStr =
+    liveWeather?.temperatureC !== null && liveWeather?.temperatureC !== undefined
+      ? `${liveWeather.temperatureC}°C`
+      : null;
+
+  let displayLabel = currentMeta.label;
+  if (isAuto) {
+    displayLabel = tempStr
+      ? `${RT05_LOCATION.city} · ${tempStr}`
+      : `${RT05_LOCATION.city} · ${currentMeta.label}`;
+  } else {
+    displayLabel = `${currentMeta.label} (Manual)`;
   }
 
+  const titleText = isAuto
+    ? `Tema Otomatis ${RT05_LOCATION.city} (${RT05_LOCATION.address}): ${
+        liveWeather?.conditionLabel ?? currentMeta.label
+      }${tempStr ? `, ${tempStr}` : ""} — Klik untuk ganti suasana (Pagi / Siang / Sore / Malam / Hujan)`
+    : `Suasana Manual: ${currentMeta.label} — Klik untuk ganti (Pagi / Siang / Sore / Malam / Hujan / Otomatis RT.05)`;
+
   return (
-    <button className="icon-button theme-toggle" type="button" onClick={toggleTheme} aria-label={`Aktifkan tema ${theme === "light" ? "gelap" : "terang"}`}>
-      {theme === "light" ? <Moon size={18} aria-hidden="true" /> : <Sun size={18} aria-hidden="true" />}
-      <span className="theme-toggle-label">{theme === "light" ? "Gelap" : "Terang"}</span>
+    <button
+      className="icon-button theme-toggle"
+      type="button"
+      onClick={cycleWeatherMode}
+      title={titleText}
+      aria-label={titleText}
+    >
+      <span
+        key={`${weatherMode}-${atmosphere}`}
+        className={`theme-toggle-icon ${currentMeta.toneClass}`}
+        aria-hidden="true"
+      >
+        <Icon size={16} />
+      </span>
+      <span className="theme-toggle-label">{displayLabel}</span>
+      {isAuto ? (
+        <span className="theme-toggle-live-badge" aria-hidden="true">
+          <Sparkles size={10} />
+          <span>Live</span>
+        </span>
+      ) : null}
     </button>
   );
 }
