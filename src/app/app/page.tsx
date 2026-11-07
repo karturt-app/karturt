@@ -4,6 +4,7 @@ import { getResidentProfile } from "@/lib/billing/resident-profile";
 import { jakartaBusinessDate } from "@/lib/officials/lifecycle";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { Settings } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -57,7 +58,10 @@ export default async function AccountHomePage() {
         <div className="topbar-actions">
           <ThemeToggle />
           <details className="account-tools">
-            <summary>Pengaturan akun</summary>
+            <summary aria-label="Pengaturan akun" title="Pengaturan akun">
+              <Settings size={16} aria-hidden="true" />
+              <span className="account-tools-label">Pengaturan akun</span>
+            </summary>
             <nav className="account-tools-links" aria-label="Pengaturan akun">
               {(principal.role === "rt_chairman" || principal.role === "system_admin") && (
                 <Link href="/app/aktivitas">Riwayat aktivitas</Link>
