@@ -7,8 +7,9 @@ import {
   isWibDaytime,
   type Atmosphere,
   type LiveWeatherInfo,
-} from "@/lib/atmosphere";
+} from "@/lib/atmosphere-core";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface OpenMeteoCurrentResponse {
@@ -33,7 +34,6 @@ export async function GET() {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,is_day,precipitation,rain,showers,weather_code,precipitation_probability,wind_speed_10m&models=ecmwf_ifs&timezone=Asia%2FJakarta`;
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(4500),
       cache: "no-store",
     });
 

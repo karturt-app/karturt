@@ -1,45 +1,35 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import {
+  MODE_ORDER,
+  RT05_LOCATION,
+  defaultAtmosphereByWib,
+  describeWeatherCode,
+  evaluateRainCondition,
+  isDarkAtmosphere,
+  isValidWeatherMode,
+  isWibDaytime,
+  type Atmosphere,
+  type LiveWeatherInfo,
+  type Theme,
+  type WeatherMode,
+} from "@/lib/atmosphere-core";
 
-export type Theme = "light" | "dark";
-export type Atmosphere = "morning" | "day" | "afternoon" | "night" | "rain";
-export type WeatherMode = "auto" | Atmosphere;
-
-export interface LiveWeatherInfo {
-  atmosphere: Atmosphere;
-  isRaining: boolean;
-  isDay: boolean;
-  temperatureC: number | null;
-  weatherCode: number;
-  conditionLabel: string;
-  city: string;
-  address: string;
-  updatedAt: string;
-  precipitationMm: number;
-  precipitationProbability: number | null;
-  windSpeedKmh: number;
-}
-
-/**
- * Titik Lokasi Tetap RT.05 (Zero GPS Prompt):
- * Gg. Niaga No.13, Jrebeng Wetan, Kec. Kedopok, Kota Probolinggo, Jawa Timur 67231
- */
-export const RT05_LOCATION = {
-  city: "RT.05",
-  address: "Gg. Niaga No.13, Jrebeng Wetan, Kec. Kedopok, Kota Probolinggo, Jawa Timur 67231",
-  lat: -7.7819,
-  lon: 113.2115,
-} as const;
-
-export const MODE_ORDER: readonly WeatherMode[] = [
-  "auto",
-  "morning",
-  "day",
-  "afternoon",
-  "night",
-  "rain",
-] as const;
+export {
+  MODE_ORDER,
+  RT05_LOCATION,
+  defaultAtmosphereByWib,
+  describeWeatherCode,
+  evaluateRainCondition,
+  isDarkAtmosphere,
+  isValidWeatherMode,
+  isWibDaytime,
+  type Atmosphere,
+  type LiveWeatherInfo,
+  type Theme,
+  type WeatherMode,
+};
 
 const META_THEME_COLORS: Record<Atmosphere, string> = {
   morning: "#edf4ef",
@@ -52,77 +42,6 @@ const META_THEME_COLORS: Record<Atmosphere, string> = {
 const STORAGE_MODE_KEY = "karturt:atmosphere-mode";
 const STORAGE_THEME_KEY = "karturt:theme";
 const EVENT_NAME = "karturt:atmosphere-change";
-
-const RAIN_MIN_MM = 0.5;
-const RAIN_MIN_PROBABILITY = 50;
-const RAIN_HEAVY_MM = 2;
-
-export function isRainyWeatherCode(code: number): boolean {
-  return (
-    (code >= 51 && code <= 67) ||
-    (code >= 80 && code <= 82) ||
-    (code >= 95 && code <= 99)
-  );
-}
-
-export function evaluateRainCondition(params: {
-  precipitationMm: number;
-  weatherCode: number;
-  precipitationProbability: number | null;
-}): boolean {
-  const { precipitationMm, weatherCode, precipitationProbability } = params;
-  const probabilityOk =
-    precipitationProbability === null ||
-    precipitationProbability >= RAIN_MIN_PROBABILITY ||
-    precipitationMm >= RAIN_HEAVY_MM;
-  return precipitationMm >= RAIN_MIN_MM && isRainyWeatherCode(weatherCode) && probabilityOk;
-}
-
-export function describeWeatherCode(code: number, isDay: boolean): string {
-  if (code >= 95) return "Hujan Petir";
-  if (code >= 80 && code <= 82) return "Hujan Deras";
-  if (code >= 61 && code <= 67) return "Hujan";
-  if (code >= 51 && code <= 57) return "Gerimis";
-  if (code === 45 || code === 48) return "Berkabut";
-  if (code === 3) return "Mendung";
-  if (code === 2) return "Berawan";
-  if (code === 1) return isDay ? "Cerah Berawan" : "Malam Berawan";
-  return isDay ? "Cerah" : "Malam Cerah";
-}
-
-export function isDarkAtmosphere(atmosphere: Atmosphere): boolean {
-  return atmosphere === "night" || atmosphere === "rain";
-}
-
-/**
- * Menentukan tema waktu berdasarkan jam WIB (UTC+7):
- * - Pagi (morning): 04:00 – 08:59 WIB
- * - Siang (day): 09:00 – 14:59 WIB
- * - Sore (afternoon): 15:00 – 18:59 WIB
- * - Malam (night): 19:00 – 03:59 WIB
- */
-export function defaultAtmosphereByWib(nowEpoch = Date.now()): Exclude<Atmosphere, "rain"> {
-  const wibHour = new Date(nowEpoch + 7 * 3600_000).getUTCHours();
-  if (wibHour >= 4 && wibHour <= 8) return "morning";
-  if (wibHour >= 9 && wibHour <= 14) return "day";
-  if (wibHour >= 15 && wibHour <= 18) return "afternoon";
-  return "night";
-}
-
-export function isWibDaytime(nowEpoch = Date.now()): boolean {
-  return defaultAtmosphereByWib(nowEpoch) !== "night";
-}
-
-export function isValidWeatherMode(val: unknown): val is WeatherMode {
-  return (
-    val === "auto" ||
-    val === "morning" ||
-    val === "day" ||
-    val === "afternoon" ||
-    val === "night" ||
-    val === "rain"
-  );
-}
 
 export function applyAtmosphereClass(atmosphere: Atmosphere): void {
   if (typeof document === "undefined") return;
@@ -299,12 +218,60 @@ export function useWeatherSync(): void {
       lastFetchedAt = now;
 
       try {
-        const res = await fetch("/api/weather", {
-          headers: { Accept: "application/json" },
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as LiveWeatherInfo;
+        let data: LiveWeatherInfo | null = null;
+        try {
+          const { lat, lon, city, address } = RT05_LOCATION;
+          const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,is_day,precipitation,rain,showers,weather_code,precipitation_probability,wind_speed_10m&models=ecmwf_ifs&timezone=Asia%2FJakarta`;
+          const directRes = await fetch(openMeteoUrl, { headers: { Accept: "application/json" } });
+          if (directRes.ok) {
+            const raw = (await directRes.json()) as {
+              current?: {
+                temperature_2m?: number;
+                is_day?: number;
+                precipitation?: number;
+                weather_code?: number;
+                precipitation_probability?: number;
+                wind_speed_10m?: number;
+              };
+            };
+            const cur = raw?.current ?? {};
+            const weatherCode = typeof cur.weather_code === "number" ? cur.weather_code : 0;
+            const windSpeedKmh = typeof cur.wind_speed_10m === "number" ? Math.round(cur.wind_speed_10m) : 0;
+            const isDay = typeof cur.is_day === "number" ? cur.is_day === 1 : isWibDaytime();
+            const precipitationMm = typeof cur.precipitation === "number" ? cur.precipitation : 0;
+            const precipitationProbability =
+              typeof cur.precipitation_probability === "number" ? cur.precipitation_probability : null;
+            const isRainingRaw = evaluateRainCondition({
+              precipitationMm,
+              weatherCode,
+              precipitationProbability,
+            });
+            data = {
+              atmosphere: isRainingRaw ? "rain" : defaultAtmosphereByWib(),
+              isRaining: isRainingRaw,
+              isDay,
+              temperatureC: typeof cur.temperature_2m === "number" ? Math.round(cur.temperature_2m) : null,
+              weatherCode,
+              conditionLabel: describeWeatherCode(weatherCode, isDay),
+              city,
+              address,
+              updatedAt: new Date().toISOString(),
+              precipitationMm,
+              precipitationProbability,
+              windSpeedKmh,
+            };
+          }
+        } catch {
+          // Fallback to /api/weather if direct fetch fails
+        }
+        if (!data) {
+          const res = await fetch("/api/weather", {
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+          });
+          if (!res.ok) return;
+          data = (await res.json()) as LiveWeatherInfo;
+        }
         if (!active || !data || !data.atmosphere) return;
 
         if (data.isRaining) {
@@ -329,7 +296,6 @@ export function useWeatherSync(): void {
       }
     }
 
-    // Pastikan kelas atmosfer terpasang sesuai jam WIB saat mount pertama
     const snap = ensureClientSnapshot();
     applyAtmosphereClass(snap.atmosphere);
 
