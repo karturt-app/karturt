@@ -82,6 +82,7 @@ export const canonicalR2SyntheticFixtureTableCounts: Readonly<Record<string, num
   billing_years: 1,
   fee_rates: 1,
   monthly_dues: 12,
+  monthly_due_recording_corrections: 0,
   due_adjustments: 0,
   payment_requests: 0,
   payments: 0,
