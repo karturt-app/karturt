@@ -131,6 +131,7 @@ function isHouseholdMatrixCell(value: unknown, expectedMonth: number, year: numb
     cell.month !== expectedMonth ||
     !["unpaid", "paid", "waived", "not_due", "no_data"].includes(cell.status ?? "") ||
     !(cell.dueDate === null || isCanonicalDate(cell.dueDate)) ||
+    !(cell.recordedAmount === null || (isSafeCount(cell.recordedAmount) && cell.recordedAmount > 0)) ||
     !matrixAmountFields.every((field) => isSafeCount(cell[field])) ||
     typeof cell.pending !== "boolean" ||
     typeof cell.overdue !== "boolean" ||
@@ -142,7 +143,7 @@ function isHouseholdMatrixCell(value: unknown, expectedMonth: number, year: numb
   if (!Number.isSafeInteger(total) || total !== validCell.effectiveTarget) return false;
 
   if (validCell.status === "no_data") {
-    return validCell.dueDate === null && !validCell.pending && !validCell.overdue && validCell.latestPaymentAt === null &&
+    return validCell.recordedAmount === null && validCell.dueDate === null && !validCell.pending && !validCell.overdue && validCell.latestPaymentAt === null &&
       matrixAmountFields.every((field) => validCell[field] === 0);
   }
 
@@ -553,6 +554,7 @@ export function ChairmanReports({
     .sort((left, right) => right - left);
   const hasYearData = Boolean(data && (data.yearly.obligationCount > 0 || data.yearly.notDueCount > 0));
   const asOfPeriodLabel = data ? reportPeriodLabel(data.asOf.period) : "";
+  const hasRecordingCorrections = Boolean(data?.householdMatrix.some((row) => row.months.some((cell) => cell.recordedAmount !== null)));
 
   return (
     <section className="chairman-reports-area" aria-labelledby="chairman-reports-title" aria-busy={loading}>
@@ -589,6 +591,11 @@ export function ChairmanReports({
 
       {data && !loading && !error && (
         <>
+          {hasRecordingCorrections && (
+            <div className="chairman-report-recording-note" role="note">
+              Nominal pencatatan 2026 telah dikoreksi untuk rumah tertentu. Tahun ini belum menjadi laporan resmi; status pembayaran dan riwayat penerimaan tetap mengikuti catatan historis.
+            </div>
+          )}
           <div className="chairman-report-view-switch" role="group" aria-label="Tampilan laporan iuran">
             <button
               type="button"

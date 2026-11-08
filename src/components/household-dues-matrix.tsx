@@ -239,7 +239,10 @@ export function HouseholdDuesMatrix({ report }: { report: RtFinancialReportRespo
                       const status = householdMatrixDisplayStatus(cell, report.asOf.businessDate);
                       const selected = selectedCell?.rowKey === row.key && selectedCell.month === cell.month;
                       const monthName = monthNames[index] ?? `Bulan ${cell.month}`;
-                      const accessibleLabel = `Rumah ${row.houseNumber}, ${monthName} ${report.year}, ${statusLabels[status]}, sisa ${rupiah(cell.outstanding)}.`;
+                      const accessibleAmount = cell.recordedAmount !== null
+                        ? `nominal pencatatan ${rupiah(cell.recordedAmount)}`
+                        : `sisa ${rupiah(cell.outstanding)}`;
+                      const accessibleLabel = `Rumah ${row.houseNumber}, ${monthName} ${report.year}, ${statusLabels[status]}, ${accessibleAmount}.`;
                       return (
                         <td key={cell.month}>
                           <button
@@ -250,7 +253,9 @@ export function HouseholdDuesMatrix({ report }: { report: RtFinancialReportRespo
                             onClick={() => setSelectedCell(selected ? null : { rowKey: row.key, month: cell.month })}
                           >
                             <span>{statusLabels[status]}</span>
-                            {cell.status !== "no_data" && cell.status !== "not_due" && <small>{cellAmount(cell)}</small>}
+                            {cell.status !== "no_data" && cell.status !== "not_due" && (
+                              <small>{cell.recordedAmount === null ? cellAmount(cell) : `Nominal ${rupiah(cell.recordedAmount)}`}</small>
+                            )}
                             {cell.pending && cell.overdue && <small className="household-matrix-cell-note">Tunggakan</small>}
                           </button>
                         </td>
@@ -281,28 +286,37 @@ export function HouseholdDuesMatrix({ report }: { report: RtFinancialReportRespo
               {periodStatusDescription(selectedMonth, report.asOf.businessDate)} Jumlah ini belum dihitung sebagai pembayaran diterima.
             </p>
           )}
+          {selectedMonth.recordedAmount !== null && (
+            <p className="household-matrix-detail-note">
+              Koreksi nominal pencatatan: {rupiah(selectedMonth.recordedAmount)}. Status pembayaran dan riwayat penerimaan tetap mengikuti catatan historis.
+            </p>
+          )}
           {(selectedMonth.status === "no_data" || selectedMonth.status === "not_due") ? (
             <p className="household-matrix-detail-note">
               {selectedMonth.status === "not_due" ? "Rumah tangga ini tidak memiliki kewajiban pada bulan ini." : "Belum ada baris tagihan untuk bulan ini."}
             </p>
           ) : (
             <>
-              {!selectedMonth.pending && selectedMonth.status === "unpaid" && (
+              {selectedMonth.recordedAmount === null && (
+                <dl className="household-matrix-detail-metrics">
+                  <div><dt>Target awal</dt><dd>{rupiah(selectedMonth.target)}</dd></div>
+                  <div><dt>Target efektif</dt><dd>{rupiah(selectedMonth.effectiveTarget)}</dd></div>
+                  <div><dt>Diterima terverifikasi</dt><dd>{rupiah(selectedMonth.received)}</dd></div>
+                  <div><dt>Saldo awal impor</dt><dd>{rupiah(selectedMonth.openingBalanceReceived)}</dd></div>
+                  <div><dt>Transfer</dt><dd>{rupiah(selectedMonth.transferReceived)}</dd></div>
+                  <div><dt>Tunai</dt><dd>{rupiah(selectedMonth.cashReceived)}</dd></div>
+                  <div><dt>Dibebaskan</dt><dd>{rupiah(selectedMonth.waived)}</dd></div>
+                  <div><dt>Sisa kewajiban</dt><dd>{rupiah(selectedMonth.outstanding)}</dd></div>
+                </dl>
+              )}
+              {selectedMonth.recordedAmount === null && !selectedMonth.pending && selectedMonth.status === "unpaid" && (
                 <p className="household-matrix-detail-note">{periodStatusDescription(selectedMonth, report.asOf.businessDate)}</p>
               )}
-              <dl className="household-matrix-detail-metrics">
-                <div><dt>Target awal</dt><dd>{rupiah(selectedMonth.target)}</dd></div>
-                <div><dt>Target efektif</dt><dd>{rupiah(selectedMonth.effectiveTarget)}</dd></div>
-                <div><dt>Diterima terverifikasi</dt><dd>{rupiah(selectedMonth.received)}</dd></div>
-                <div><dt>Saldo awal impor</dt><dd>{rupiah(selectedMonth.openingBalanceReceived)}</dd></div>
-                <div><dt>Transfer</dt><dd>{rupiah(selectedMonth.transferReceived)}</dd></div>
-                <div><dt>Tunai</dt><dd>{rupiah(selectedMonth.cashReceived)}</dd></div>
-                <div><dt>Dibebaskan</dt><dd>{rupiah(selectedMonth.waived)}</dd></div>
-                <div><dt>Sisa kewajiban</dt><dd>{rupiah(selectedMonth.outstanding)}</dd></div>
-              </dl>
-              <p className="household-matrix-detail-note">
-                Pembayaran terverifikasi terbaru pada bulan ini: {timestampLabel(selectedMonth.latestPaymentAt)}
-              </p>
+              {selectedMonth.recordedAmount === null && (
+                <p className="household-matrix-detail-note">
+                  Pembayaran terverifikasi terbaru pada bulan ini: {timestampLabel(selectedMonth.latestPaymentAt)}
+                </p>
+              )}
             </>
           )}
         </article>

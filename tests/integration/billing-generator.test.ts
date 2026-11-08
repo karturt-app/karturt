@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { AppDatabase } from "../../src/db/client";
-import { billingYears, households, monthlyDues } from "../../src/db/schema";
+import { billingYears, feeRates, households, monthlyDueRecordingCorrections, monthlyDues } from "../../src/db/schema";
 import { activateBillingYear } from "../../src/lib/billing/activation";
 import { generateHouseholdDues } from "../../src/lib/billing/generator";
-import { createFeeRateFixture, createHousehold, createRt, createTestDatabase } from "../helpers/database";
+import { listChairmanFeeRates } from "../../src/lib/billing/chairman-fee-rates";
+import { getDueFinancialBalances } from "../../src/lib/billing/due-balance";
+import { createFeeRateFixture, createHousehold, createRt, createTestDatabase, ensureTestChairman } from "../helpers/database";
 import type { Principal } from "../../src/lib/auth/permissions";
 
 function chairmanFor(rtUnitId: string): Principal {
@@ -35,7 +37,7 @@ describe("monthly-dues database integration", () => {
       generateHouseholdDues(db as unknown as AppDatabase, chairman, { householdId: household.householdId, billingYearId: year.id }),
       generateHouseholdDues(db as unknown as AppDatabase, chairman, { householdId: household.householdId, billingYearId: year.id }),
     ]);
-    const rows = await db.select().from(monthlyDues).where((await import("drizzle-orm")).eq(monthlyDues.householdId, household.householdId)).orderBy(monthlyDues.month);
+    const rows = await db.select().from(monthlyDues).where(eq(monthlyDues.householdId, household.householdId)).orderBy(monthlyDues.month);
 
     expect(result.insertedCount).toBe(12);
     expect(concurrentRetries.reduce((total, retry) => total + retry.insertedCount, 0)).toBe(0);
@@ -76,7 +78,7 @@ describe("monthly-dues database integration", () => {
     const rtUnitId = await createRt(db);
     const chairman = chairmanFor(rtUnitId);
     const household = await createHousehold(db, rtUnitId);
-    await db.update(households).set({ status: "inactive", endsOn: "2026-06-30" }).where((await import("drizzle-orm")).eq(households.id, household.householdId));
+    await db.update(households).set({ status: "inactive", endsOn: "2026-06-30" }).where(eq(households.id, household.householdId));
 
     const [year] = await db.insert(billingYears).values({ rtUnitId, year: 2026 }).returning({ id: billingYears.id });
     await createFeeRateFixture(db, { rtUnitId, billingYearId: year.id, effectiveMonth: 1, monthlyAmount: 40_000 });
@@ -140,5 +142,78 @@ describe("monthly-dues database integration", () => {
     })).rejects.toThrow("not found in this RT");
     const [unchanged] = await db.select({ status: billingYears.status }).from(billingYears).where(eq(billingYears.id, year.id));
     expect(unchanged?.status).toBe("draft");
+  });
+
+  it("keeps corrected recording separate from the original snapshot and carries the tariff forward once", async () => {
+    const { db } = testDatabase;
+    const rtUnitId = await createRt(db);
+    const appAccountId = await ensureTestChairman(db, rtUnitId);
+    const chairman: Principal = { ...chairmanFor(rtUnitId), appAccountId };
+    const correctedHouse = await createHousehold(db, rtUnitId, { number: "BLOKD1", startsOn: "2026-01-01" });
+    const otherHouse = await createHousehold(db, rtUnitId, { number: "BLOKD2", startsOn: "2026-01-01" });
+    const [priorYear] = await db.insert(billingYears).values({ rtUnitId, year: 2026 }).returning({ id: billingYears.id });
+    await createFeeRateFixture(db, { rtUnitId, billingYearId: priorYear!.id, effectiveMonth: 1, monthlyAmount: 40_000 });
+    await activateBillingYear(db as unknown as AppDatabase, chairman, { billingYearId: priorYear!.id });
+    await generateHouseholdDues(db as unknown as AppDatabase, chairman, { householdId: correctedHouse.householdId, billingYearId: priorYear!.id });
+    await generateHouseholdDues(db as unknown as AppDatabase, chairman, { householdId: otherHouse.householdId, billingYearId: priorYear!.id });
+
+    const [correctedDue] = await db.select({ id: monthlyDues.id })
+      .from(monthlyDues)
+      .where(and(eq(monthlyDues.householdId, correctedHouse.householdId), eq(monthlyDues.month, 12)));
+    await db.insert(monthlyDueRecordingCorrections).values({
+      rtUnitId,
+      householdId: correctedHouse.householdId,
+      monthlyDueId: correctedDue!.id,
+      recordedAmount: 50_000,
+      collectionTargetAmount: 50_000,
+      correctionCode: "2026_household_tariff_recording_v1",
+    });
+
+    const [correctedBalance, untouchedBalance] = await Promise.all([
+      db.select({ id: monthlyDues.id }).from(monthlyDues).where(and(
+        eq(monthlyDues.householdId, correctedHouse.householdId),
+        eq(monthlyDues.month, 12),
+      )).then((rows) => getDueFinancialBalances(db as unknown as AppDatabase, [rows[0]!.id])),
+      db.select({ id: monthlyDues.id }).from(monthlyDues).where(and(
+        eq(monthlyDues.householdId, otherHouse.householdId),
+        eq(monthlyDues.month, 12),
+      )).then((rows) => getDueFinancialBalances(db as unknown as AppDatabase, [rows[0]!.id])),
+    ]).then(([corrected, untouched]) => [corrected[0]!, untouched[0]!] as const);
+    expect(correctedBalance).toMatchObject({ originalAmount: 40_000, effectiveTarget: 40_000, recordedAmount: 50_000, collectionTarget: 50_000, outstanding: 50_000 });
+    expect(untouchedBalance).toMatchObject({ originalAmount: 40_000, effectiveTarget: 40_000, recordedAmount: null, collectionTarget: 40_000, outstanding: 40_000 });
+    await expect(db.update(monthlyDueRecordingCorrections)
+      .set({ recordedAmount: 60_000 })
+      .where(eq(monthlyDueRecordingCorrections.monthlyDueId, correctedDue!.id)))
+      .rejects.toThrow();
+    const [unchangedCorrection] = await db.select({ recordedAmount: monthlyDueRecordingCorrections.recordedAmount })
+      .from(monthlyDueRecordingCorrections)
+      .where(eq(monthlyDueRecordingCorrections.monthlyDueId, correctedDue!.id));
+    expect(unchangedCorrection?.recordedAmount).toBe(50_000);
+
+    const [targetYear] = await db.insert(billingYears).values({ rtUnitId, year: 2027 }).returning({ id: billingYears.id });
+    await createFeeRateFixture(db, { rtUnitId, billingYearId: targetYear!.id, effectiveMonth: 1, monthlyAmount: 40_000 });
+    await db.update(billingYears).set({ status: "closed" }).where(eq(billingYears.id, priorYear!.id));
+
+    const unverifiedChairman: Principal = { ...chairman, appAccountId: "missing-chairman-account" };
+    await expect(activateBillingYear(db as unknown as AppDatabase, unverifiedChairman, { billingYearId: targetYear!.id }))
+      .rejects.toThrow("Ketua RT aktif");
+    const [rolledBackYear] = await db.select({ status: billingYears.status }).from(billingYears)
+      .where(eq(billingYears.id, targetYear!.id));
+    expect(rolledBackYear?.status).toBe("draft");
+
+    await activateBillingYear(db as unknown as AppDatabase, chairman, { billingYearId: targetYear!.id });
+    await activateBillingYear(db as unknown as AppDatabase, chairman, { billingYearId: targetYear!.id });
+    const carriedRates = await db.select({ householdId: feeRates.householdId, monthlyAmount: feeRates.monthlyAmount })
+      .from(feeRates)
+      .where(and(eq(feeRates.billingYearId, targetYear!.id), eq(feeRates.effectiveMonth, 1)));
+    expect(carriedRates).toHaveLength(2);
+    expect(carriedRates.find((rate) => rate.householdId === correctedHouse.householdId)?.monthlyAmount).toBe(50_000);
+    expect(carriedRates.find((rate) => rate.householdId === otherHouse.householdId)).toBeUndefined();
+    const visibleRates = await listChairmanFeeRates(db as unknown as AppDatabase, chairman, targetYear!.id);
+    expect(visibleRates.rates).toContainEqual(expect.objectContaining({
+      householdNumber: "BLOKD1",
+      effectiveMonth: 1,
+      monthlyAmount: 50_000,
+    }));
   });
 });

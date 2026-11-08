@@ -398,6 +398,26 @@ export const monthlyDues = pgTable("monthly_dues", {
   ),
 ]);
 
+export const monthlyDueRecordingCorrections = pgTable("monthly_due_recording_corrections", {
+  rtUnitId: uuid("rt_unit_id").notNull(),
+  householdId: uuid("household_id").notNull(),
+  monthlyDueId: uuid("monthly_due_id").notNull(),
+  recordedAmount: integer("recorded_amount").notNull(),
+  collectionTargetAmount: integer("collection_target_amount").notNull(),
+  correctionCode: varchar("correction_code", { length: 80 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ name: "monthly_due_recording_corrections_pk", columns: [table.monthlyDueId] }),
+  foreignKey({
+    name: "monthly_due_recording_corrections_due_scope_fk",
+    columns: [table.rtUnitId, table.householdId, table.monthlyDueId],
+    foreignColumns: [monthlyDues.rtUnitId, monthlyDues.householdId, monthlyDues.id],
+  }).onDelete("restrict"),
+  check("monthly_due_recording_corrections_recorded_amount_positive", sql`${table.recordedAmount} > 0`),
+  check("monthly_due_recording_corrections_collection_target_positive", sql`${table.collectionTargetAmount} > 0`),
+  check("monthly_due_recording_corrections_code", sql`${table.correctionCode} = '2026_household_tariff_recording_v1'`),
+]);
+
 export const sheet2OpeningBalanceItems = pgTable("sheet2_opening_balance_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   rtUnitId: uuid("rt_unit_id").notNull(),
@@ -819,6 +839,7 @@ export const schema = {
   sheet2ImportBatches,
   feeRates,
   monthlyDues,
+  monthlyDueRecordingCorrections,
   sheet2OpeningBalanceItems,
   dueAdjustments,
   paymentRequests,

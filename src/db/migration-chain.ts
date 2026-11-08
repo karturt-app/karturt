@@ -17,6 +17,7 @@ export const officialMigrationTags = [
   "0015_sheet2_opening_balance_import",
   "0016_phase_14_household_join_month_tariff",
   "0017_phase_14_household_fee_rate_source_scope",
+  "0018_0018_household_tariff_recording_correction",
 ] as const;
 
 export const officialMigrationCount = officialMigrationTags.length;

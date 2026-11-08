@@ -115,7 +115,7 @@ function makePool(applicationName: string, max: number): DbPool {
 const migrationsDirectory = resolve(process.cwd(), "drizzle");
 const evidencePath = resolve(process.cwd(), "docs/launch-safety-evidence/postgres-independent-concurrency.json");
 const migrationNames = readdirSync(migrationsDirectory).filter((name) => name.endsWith(".sql")).sort();
-if (migrationNames.length !== 18 || migrationNames.at(-1) !== "0017_phase_14_household_fee_rate_source_scope.sql") {
+if (migrationNames.length !== 19 || migrationNames.at(-1) !== "0018_0018_household_tariff_recording_correction.sql") {
   throw new Error("Concurrency proof requires the checked-in 0000–0017 migration set.");
 }
 

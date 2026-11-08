@@ -159,11 +159,12 @@ export async function getResidentMonthlyDues(
       return {
         billingYear: due.billingYear,
         month: due.month,
-        // Preserve the legacy amount field as the effective obligation amount.
-        amount: balance.effectiveTarget,
+        // The amount due follows the collection target; the source snapshot remains separately available.
+        amount: balance.collectionTarget,
         originalAmount: balance.originalAmount,
+        recordedAmount: balance.recordedAmount,
         adjustmentTotal: balance.adjustmentTotal,
-        effectiveTarget: balance.effectiveTarget,
+        effectiveTarget: balance.collectionTarget,
         activeReceived: balance.activeReceived,
         outstanding: balance.outstanding,
         dueDate: due.dueDate,

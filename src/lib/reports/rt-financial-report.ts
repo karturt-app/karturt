@@ -287,6 +287,7 @@ export async function getRtFinancialReport(
       dueDate: due.dueDate,
       status: due.status,
       originalAmount: balance.originalAmount,
+      recordedAmount: balance.recordedAmount,
       adjustmentTotal: balance.adjustmentTotal,
       activeReceived: verifiedPaymentReceived,
       importedOpeningBalance: balance.importedOpeningBalance,

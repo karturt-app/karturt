@@ -37,6 +37,7 @@ const migrationTags = [
   "0010_phase_9_payment_reversal", "0011_phase_10_waiver", "0012_phase_11_tariff_adjustment", "0013_phase_12_household_management",
   "0014_handy_genesis", "0015_sheet2_opening_balance_import",
   "0016_phase_14_household_join_month_tariff", "0017_phase_14_household_fee_rate_source_scope",
+  "0018_0018_household_tariff_recording_correction",
 ] as const;
 
 export function assertPostgresMajor18(versionNum: number) {

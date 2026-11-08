@@ -350,6 +350,23 @@ describe("F13 report aggregation", () => {
     });
   });
 
+  it("shows a recording correction in the household matrix without changing historical financial totals", () => {
+    const identity = household({ householdId: "recording", houseNumber: "BLOKD1" });
+    const report = aggregateRtFinancialReport([
+      due(identity, 1, {
+        status: "paid",
+        activeReceived: 0,
+        importedOpeningBalance: 40_000,
+        recordedAmount: 50_000,
+      }),
+      due(identity, 11, { recordedAmount: 50_000 }),
+    ], { year: YEAR, availableYears: [YEAR], businessDate: BUSINESS_DATE });
+
+    expect(report.yearly).toMatchObject({ target: 80_000, effectiveTarget: 80_000, openingBalanceReceived: 40_000, outstanding: 40_000 });
+    expect(report.householdMatrix[0]?.months[0]).toMatchObject({ status: "paid", recordedAmount: 50_000, openingBalanceReceived: 40_000 });
+    expect(report.householdMatrix[0]?.months[10]).toMatchObject({ status: "unpaid", recordedAmount: 50_000, outstanding: 40_000 });
+  });
+
   it("fails closed on unsafe totals, method mismatches, invalid NOT_DUE activity, and inconsistent waiver amounts", () => {
     const identity = household({ householdId: "invalid", houseNumber: "A-06" });
     expect(() => aggregateRtFinancialReport([

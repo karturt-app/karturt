@@ -1068,6 +1068,8 @@ button { color: inherit; }
 .chairman-report-alert > svg { margin-top: 2px; }
 .chairman-report-alert p { min-width: 0; margin: 0; line-height: 1.45; overflow-wrap: anywhere; }
 .dark .chairman-report-alert { border-color: #804941; color: #f4b5ad; background: #3a2928; }
+.chairman-report-recording-note { margin: 15px 0; padding: 13px 15px; border: 1px solid color-mix(in srgb, var(--teal) 34%, var(--line)); border-radius: 12px; color: var(--ink); background: color-mix(in srgb, var(--teal-wash) 74%, var(--surface)); font-size: 13px; line-height: 1.5; }
+.due-recording-note { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.4; }
 .chairman-report-button { grid-column: 2; width: fit-content; min-width: 125px; min-height: 44px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--ink); background: var(--surface); font: inherit; font-size: 14px; font-weight: 750; cursor: pointer; transition: transform 170ms ease, border-color 170ms ease, background-color 170ms ease; }
 .chairman-report-button:hover { border-color: var(--teal); background: var(--teal-wash); }
 .chairman-report-button:active { transform: scale(.97); }

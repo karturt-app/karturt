@@ -505,7 +505,7 @@ export function ResidentMonthCard({
 }) {
   const token = due ? dueToken(due) : "MISSING";
   const displayAmount = due
-    ? due.status === "unpaid" ? due.outstanding : due.effectiveTarget
+    ? due.status === "unpaid" ? due.outstanding : due.recordedAmount ?? due.effectiveTarget
     : null;
   const adjustmentMessage = due && due.status === "unpaid" && due.periodTiming !== "future" && due.activeReceived > 0 &&
     due.adjustmentTotal > 0 && due.outstanding > 0
@@ -519,11 +519,21 @@ export function ResidentMonthCard({
           <summary aria-label={`Lihat kuitansi iuran ${name} ${due.billingYear}`}>
             <h2>{name}</h2>
             <ResidentDueStatus token={token} />
-            <strong>{rupiah(due.effectiveTarget)}</strong>
+            <strong>{rupiah(due.recordedAmount ?? due.effectiveTarget)}</strong>
+            {due.recordedAmount != null && (
+              <small className="due-recording-note">
+                Nominal pencatatan diperbarui; status dan riwayat penerimaan tetap mengikuti catatan sebelumnya.
+              </small>
+            )}
             <span className="due-receipt-hint">Ketuk untuk lihat kuitansi</span>
           </summary>
           <div className="due-receipt-detail">
             <h3>Rincian pembayaran {name} {due.billingYear}</h3>
+            {due.recordedAmount != null && (
+              <p>
+                Ini koreksi nominal pencatatan. Rincian penerimaan di bawah tetap berasal dari catatan historis dan tidak diubah.
+              </p>
+            )}
             {receipts.length === 0 ? (
               due.openingBalanceImport ? (
                 <p>
@@ -564,6 +574,11 @@ export function ResidentMonthCard({
         {due && due.status !== "not_due" && !(due.status === "unpaid" && due.periodTiming === "future")
           ? rupiah(displayAmount ?? 0) : "—"}
       </strong>
+      {due?.recordedAmount != null && (
+        <small className="due-recording-note">
+          Nominal pencatatan diperbarui; status dan riwayat penerimaan tetap mengikuti catatan sebelumnya.
+        </small>
+      )}
       {adjustmentMessage && <p>{adjustmentMessage}</p>}
     </li>
   );
@@ -796,8 +811,11 @@ export function ResidentCard({
                           {residentStatusLabels[dueToken(d)]} ·{" "}
                           {d.status === "not_due" || (d.status === "unpaid" && d.periodTiming === "future")
                             ? "—"
-                            : rupiah(d.status === "unpaid" ? d.outstanding : d.effectiveTarget)}
+                            : rupiah(d.status === "unpaid" ? d.outstanding : d.recordedAmount ?? d.effectiveTarget)}
                         </span>
+                        {d.recordedAmount != null && (
+                          <small className="due-recording-note">Nominal pencatatan diperbarui; status dan riwayat penerimaan tetap.</small>
+                        )}
                         {d.status === "unpaid" && d.activeReceived > 0 &&
                           d.adjustmentTotal > 0 && d.outstanding > 0 && (
                             <small>

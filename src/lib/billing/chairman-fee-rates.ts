@@ -5,6 +5,8 @@ import {
   appAccounts,
   billingYears,
   feeRates,
+  houses,
+  households,
   monthlyDues,
   officialAssignments,
 } from "@/db/schema";
@@ -32,6 +34,7 @@ export interface CreateChairmanFeeRateInput {
 export interface ChairmanFeeRateView {
   id: string;
   billingYearId: string;
+  householdNumber: string | null;
   effectiveMonth: number;
   monthlyAmount: number;
   createdAt: Date;
@@ -94,7 +97,7 @@ function normalizeCreateInput(input: CreateChairmanFeeRateInput) {
   };
 }
 
-async function assertActiveChairman(
+export async function assertActiveChairman(
   database: AppDatabase,
   principal: Principal,
   businessDate = jakartaBusinessDate(),
@@ -140,10 +143,14 @@ async function assertActiveChairman(
   return { rtUnitId, appAccountId: principal.appAccountId };
 }
 
-function feeRateView(row: ChairmanFeeRateView, idempotentReplay: boolean): ChairmanFeeRateResult {
+function feeRateView(
+  row: Omit<ChairmanFeeRateView, "householdNumber"> & { householdNumber?: string | null },
+  idempotentReplay: boolean,
+): ChairmanFeeRateResult {
   return {
     id: row.id,
     billingYearId: row.billingYearId,
+    householdNumber: row.householdNumber ?? null,
     effectiveMonth: row.effectiveMonth,
     monthlyAmount: row.monthlyAmount,
     createdAt: row.createdAt,
@@ -172,19 +179,28 @@ export async function listChairmanFeeRates(
     .orderBy(asc(billingYears.year));
 
   const yearFilter = billingYearId === undefined
-    ? and(eq(feeRates.rtUnitId, rtUnitId), isNull(feeRates.householdId))
-    : and(eq(feeRates.rtUnitId, rtUnitId), eq(feeRates.billingYearId, billingYearId), isNull(feeRates.householdId));
+    ? eq(feeRates.rtUnitId, rtUnitId)
+    : and(eq(feeRates.rtUnitId, rtUnitId), eq(feeRates.billingYearId, billingYearId));
   const rates = await database
     .select({
       id: feeRates.id,
       billingYearId: feeRates.billingYearId,
+      householdNumber: houses.number,
       effectiveMonth: feeRates.effectiveMonth,
       monthlyAmount: feeRates.monthlyAmount,
       createdAt: feeRates.createdAt,
     })
     .from(feeRates)
+    .leftJoin(households, and(
+      eq(households.id, feeRates.householdId),
+      eq(households.rtUnitId, feeRates.rtUnitId),
+    ))
+    .leftJoin(houses, and(
+      eq(houses.id, households.houseId),
+      eq(houses.rtUnitId, households.rtUnitId),
+    ))
     .where(yearFilter)
-    .orderBy(asc(feeRates.billingYearId), asc(feeRates.effectiveMonth), asc(feeRates.createdAt));
+    .orderBy(asc(feeRates.billingYearId), asc(feeRates.effectiveMonth), asc(houses.number), asc(feeRates.createdAt));
 
   return { years, rates };
 }

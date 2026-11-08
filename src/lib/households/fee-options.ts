@@ -1,4 +1,4 @@
-export const NEW_HOUSEHOLD_MONTHLY_FEE_OPTIONS = [32_000, 40_000] as const;
+export const NEW_HOUSEHOLD_MONTHLY_FEE_OPTIONS = [25_000, 32_000, 40_000, 50_000] as const;
 
 export type NewHouseholdMonthlyFeeOption = typeof NEW_HOUSEHOLD_MONTHLY_FEE_OPTIONS[number];
 
