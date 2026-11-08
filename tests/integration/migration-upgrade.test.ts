@@ -28,7 +28,7 @@ import type { AppDatabase } from "../../src/db/client";
 import type { Principal } from "../../src/lib/auth/permissions";
 import { recordTreasurerCashPayment } from "../../src/lib/billing/treasurer-cash-payments";
 import { createChairmanAdjustment } from "../../src/lib/billing/chairman-adjustment";
-import { createAuthUser, createHousehold, createRt } from "../helpers/database";
+import { createAuthUser, createHousehold, createRt, installEmptyMonthlyDueRecordingCorrectionsTable } from "../helpers/database";
 
 const gateCHistoryTables = [
   ["monthly_dues", "id"],
@@ -426,20 +426,7 @@ describe("legacy billing migration upgrade", () => {
       const sheet2OpeningBalanceMigration = "0015_sheet2_opening_balance_import.sql";
       await upgradeClient.exec(readFileSync(resolve(migrationFolder, sheet2OpeningBalanceMigration), "utf8"));
       expect(await snapshotGateCHistory(upgradeClient)).toEqual(gateCHistoryBefore);
-      // This legacy fixture stops before the 0018 operational backfill. Install
-      // its empty relation so current balance readers can exercise the historic
-      // payment ledger without changing this test's migration-history scope.
-      await upgradeClient.exec(`
-        CREATE TABLE public.monthly_due_recording_corrections (
-          rt_unit_id uuid NOT NULL,
-          household_id uuid NOT NULL,
-          monthly_due_id uuid PRIMARY KEY,
-          recorded_amount integer NOT NULL CHECK (recorded_amount > 0),
-          collection_target_amount integer NOT NULL CHECK (collection_target_amount > 0),
-          correction_code varchar(80) NOT NULL CHECK (correction_code = '2026_household_tariff_recording_v1'),
-          created_at timestamptz NOT NULL DEFAULT now()
-        )
-      `);
+      await installEmptyMonthlyDueRecordingCorrectionsTable(upgradeClient);
       await createChairmanAdjustment(db as unknown as AppDatabase, chairmanPrincipal, {
         monthlyDueId: duesBeforeUpgrade.find((due) => due.month === 3)!.id,
         amountDelta: 10000,
