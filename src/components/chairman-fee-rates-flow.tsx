@@ -8,6 +8,7 @@ type BillingYear = { id: string; year: number; status: string };
 type FeeRate = {
   id: string;
   billingYearId: string;
+  householdNumber: string | null;
   effectiveMonth: number;
   monthlyAmount: number;
   createdAt: string;
@@ -336,7 +337,10 @@ export function ChairmanFeeRatesFlow() {
             {yearRates.map((rate) => (
               <li key={rate.id}>
                 <div>
-                  <strong>{monthLabel(rate.effectiveMonth, selectedYear.year)}</strong>
+                  <strong>
+                    {rate.householdNumber ? `Rumah ${rate.householdNumber} · ` : ""}
+                    {monthLabel(rate.effectiveMonth, selectedYear.year)}
+                  </strong>
                   <time dateTime={rate.createdAt}>Dicatat {dateLabel(rate.createdAt)}</time>
                 </div>
                 <b>{rupiah(rate.monthlyAmount)}</b>

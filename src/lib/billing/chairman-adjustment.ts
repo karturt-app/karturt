@@ -250,7 +250,7 @@ export async function getChairmanAdjustmentHousehold(
       status: due.status,
       originalAmount: balance.originalAmount,
       adjustmentTotal: balance.adjustmentTotal,
-      effectiveTarget: balance.effectiveTarget,
+      effectiveTarget: balance.collectionTarget,
       activeReceived: balance.activeReceived,
       outstanding: balance.outstanding,
       hasPendingRequest: balance.hasPendingRequest,
@@ -357,7 +357,7 @@ export async function createChairmanAdjustment(
       if (balance.hasPendingRequest) {
         throw new ChairmanAdjustmentConflictError("Permintaan pembayaran yang menunggu melindungi nominal tagihan ini.");
       }
-      const effectiveTargetAfter = balance.effectiveTarget + normalized.amountDelta;
+      const effectiveTargetAfter = balance.collectionTarget + normalized.amountDelta;
       if (!Number.isSafeInteger(effectiveTargetAfter) || effectiveTargetAfter <= 0 || effectiveTargetAfter > MAX_AMOUNT) {
         throw new InvalidChairmanAdjustmentInputError("Target kewajiban setelah penyesuaian harus tetap lebih besar dari Rp0.");
       }

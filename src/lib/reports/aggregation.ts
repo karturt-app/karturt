@@ -50,6 +50,7 @@ export type HouseholdMatrixCell = ReportAmounts & {
   month: number;
   dueDate: string | null;
   status: ReportDueStatus | "no_data";
+  recordedAmount: number | null;
   pending: boolean;
   overdue: boolean;
   latestPaymentAt: string | null;
@@ -100,6 +101,7 @@ export type ReportDueInput = {
   dueDate: string;
   status: ReportDueStatus;
   originalAmount: number;
+  recordedAmount?: number | null;
   adjustmentTotal: number;
   activeReceived: number;
   importedOpeningBalance: number;
@@ -177,6 +179,7 @@ function emptyHouseholdMatrixCell(month: number): HouseholdMatrixCell {
     month,
     dueDate: null,
     status: "no_data",
+    recordedAmount: null,
     target: 0,
     effectiveTarget: 0,
     received: 0,
@@ -232,6 +235,10 @@ function calculateDue(due: ReportDueInput, year: number, businessDate: string): 
   }
 
   const targetAmount = safeInteger(due.originalAmount, "target amount");
+  const recordedAmount = due.recordedAmount ?? null;
+  if (recordedAmount !== null && safeInteger(recordedAmount, "recorded amount") <= 0) {
+    throw new ReportInvariantError("A recorded correction amount must be positive.");
+  }
   const adjustmentTotal = safeInteger(due.adjustmentTotal, "adjustment total", { nonNegative: false });
   const received = safeInteger(due.activeReceived, "received amount");
   const openingBalanceReceived = safeInteger(due.importedOpeningBalance, "imported opening balance");
@@ -385,6 +392,7 @@ export function aggregateRtFinancialReport(
       month: due.month,
       dueDate: due.dueDate,
       status: due.status,
+      recordedAmount: due.recordedAmount ?? null,
       target: summary.target,
       effectiveTarget: summary.effectiveTarget,
       received: summary.received,

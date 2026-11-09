@@ -361,7 +361,7 @@ export async function getChairmanWaiverHousehold(
     let selectable = false;
     if (due.status === "unpaid" && balance.outstanding > 0 && balance.activeReceived === 0 && !balance.hasPendingRequest) {
       statusLabel = "Belum bayar";
-      selectable = balance.effectiveTarget > 0;
+      selectable = balance.collectionTarget > 0;
     } else if (due.status === "unpaid" && balance.hasPendingRequest) {
       statusLabel = "Menunggu konfirmasi";
     } else if (due.status === "paid") {
@@ -375,7 +375,7 @@ export async function getChairmanWaiverHousehold(
     }
     return {
       period: canonicalPeriod(due.year, due.month),
-      amount: balance.effectiveTarget,
+      amount: balance.collectionTarget,
       statusLabel,
       selectable,
     };
@@ -650,7 +650,7 @@ export async function createChairmanWaiver(
             balance.householdId !== normalized.householdId ||
             balance.status !== "unpaid" ||
             balance.outstanding <= 0 ||
-            balance.effectiveTarget <= 0 ||
+            balance.collectionTarget <= 0 ||
             balance.activeReceived > 0 ||
             balance.hasPendingRequest;
         })
@@ -661,7 +661,7 @@ export async function createChairmanWaiver(
         throw new ChairmanWaiverConflictError("Satu atau beberapa periode sedang dimiliki pembayaran aktif.");
       }
 
-      const totalAmount = dues.reduce((total, due) => total + (balancesByDueId.get(due.id)?.effectiveTarget ?? 0), 0);
+      const totalAmount = dues.reduce((total, due) => total + (balancesByDueId.get(due.id)?.collectionTarget ?? 0), 0);
       if (!Number.isSafeInteger(totalAmount) || totalAmount <= 0) {
         throw new ChairmanWaiverPeriodUnavailableError("Jumlah pemutihan belum dapat dihitung.");
       }
@@ -688,7 +688,7 @@ export async function createChairmanWaiver(
         householdId: normalized.householdId,
         monthlyDueId: due.id,
         period: canonicalPeriod(due.year, due.month),
-        amount: balancesByDueId.get(due.id)!.effectiveTarget,
+        amount: balancesByDueId.get(due.id)!.collectionTarget,
       })));
 
       const updatedDues = await transaction

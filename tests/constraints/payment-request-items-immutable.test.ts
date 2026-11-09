@@ -16,7 +16,7 @@ import {
 } from "../../src/db/schema";
 import { resolvePrincipalForUser } from "../../src/lib/auth/principal";
 import { createResidentPaymentRequest } from "../../src/lib/billing/resident-payment-request";
-import { createAuthUser, createHousehold, createRt } from "../helpers/database";
+import { createAuthUser, createHousehold, createRt, installEmptyMonthlyDueRecordingCorrectionsTable } from "../helpers/database";
 
 function sqlState(error: unknown): string | undefined {
   let current = error;
@@ -118,6 +118,7 @@ describe("payment request item snapshot migration", () => {
     await client.exec(readFileSync(resolve(migrationFolder, "0013_phase_12_household_management.sql"), "utf8"));
     await client.exec(readFileSync(resolve(migrationFolder, "0014_handy_genesis.sql"), "utf8"));
     await client.exec(readFileSync(resolve(migrationFolder, "0015_sheet2_opening_balance_import.sql"), "utf8"));
+    await installEmptyMonthlyDueRecordingCorrectionsTable(client);
 
     const principal = await resolvePrincipalForUser(database as never, auth.id, "2026-06-18");
 

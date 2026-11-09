@@ -37,6 +37,7 @@ const migrationTags = [
   "0010_phase_9_payment_reversal", "0011_phase_10_waiver", "0012_phase_11_tariff_adjustment", "0013_phase_12_household_management",
   "0014_handy_genesis", "0015_sheet2_opening_balance_import",
   "0016_phase_14_household_join_month_tariff", "0017_phase_14_household_fee_rate_source_scope",
+  "0018_0018_household_tariff_recording_correction",
 ] as const;
 
 export function assertPostgresMajor18(versionNum: number) {
@@ -98,8 +99,8 @@ function workingTreeIsClean() {
 function readOfficialMigrations() {
   const journal = JSON.parse(readFileSync(journalPath, "utf8")) as { entries: Array<{ idx: number; when: number; tag: string }> };
   const migrations = readMigrationFiles({ migrationsFolder: migrationDir });
-  assert.equal(journal.entries.length, 18, "checked-in journal has exactly 18 entries");
-  assert.equal(migrations.length, 18, "Drizzle discovers exactly 18 official migrations");
+  assert.equal(journal.entries.length, 19, "checked-in journal has exactly 19 entries");
+  assert.equal(migrations.length, 19, "Drizzle discovers exactly 19 official migrations");
   migrationTags.forEach((tag, index) => {
     assert.equal(journal.entries[index]!.idx, index);
     assert.equal(journal.entries[index]!.tag, tag, `journal entry ${index} is the official migration ${tag}`);
@@ -112,7 +113,7 @@ async function assertMigrationLedger(pool: Pool, source: ReturnType<typeof readO
   const result = await pool.query<{ id: number; hash: string; created_at: string }>(
     "SELECT id, hash, created_at::text AS created_at FROM drizzle.__drizzle_migrations ORDER BY id",
   );
-  assert.equal(result.rows.length, 18, "migration ledger has exactly 18 entries");
+  assert.equal(result.rows.length, 19, "migration ledger has exactly 19 entries");
   result.rows.forEach((row, index) => {
     assert.equal(Number(row.id), index + 1, `ledger row ${index} sequence matches`);
     assert.equal(row.hash, source.migrations[index]!.hash, `ledger row ${index} SQL hash matches the official file`);
@@ -391,7 +392,7 @@ function writeEvidence(sha: string, postgresVersion: string, passes: PassEvidenc
     `- Result: PASS (${sha})`,
     `- PostgreSQL: ${postgresVersion} (major 18)`,
     `- Checked-out source tree clean: ${clean}.`,
-    "- Official Drizzle migrations 0000–0017: exact journal and schema verified on both builds.",
+    "- Official Drizzle migrations 0000–0018: exact journal and schema verified on both builds.",
     "- Synthetic fixture: freshly generated credentials, idempotent replay, payment/dues accounting, and reversal checks passed on both builds.",
     "- Recovery: the generated database was dropped and recreated, then migrated and reseeded successfully.",
     "- Neon PITR: NOT TESTED.",

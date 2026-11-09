@@ -30,6 +30,25 @@ export async function createTestDatabase() {
   return { client, db: drizzle(client, { schema: relationalSchema }), close: () => client.close() };
 }
 
+/**
+ * Add the empty correction relation to tests that intentionally stop at an
+ * older migration but exercise current billing readers. Record backfill and
+ * trigger behavior remain covered by the current-migration integration tests.
+ */
+export async function installEmptyMonthlyDueRecordingCorrectionsTable(client: PGlite) {
+  await client.exec(`
+    CREATE TABLE public.monthly_due_recording_corrections (
+      rt_unit_id uuid NOT NULL,
+      household_id uuid NOT NULL,
+      monthly_due_id uuid PRIMARY KEY,
+      recorded_amount integer NOT NULL CHECK (recorded_amount > 0),
+      collection_target_amount integer NOT NULL CHECK (collection_target_amount > 0),
+      correction_code varchar(80) NOT NULL CHECK (correction_code = '2026_household_tariff_recording_v1'),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+}
+
 type TestDatabase = Awaited<ReturnType<typeof createTestDatabase>>;
 
 function jakartaToday() {

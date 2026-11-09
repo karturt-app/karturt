@@ -12,6 +12,7 @@ export type ResidentDue = {
   /** Compatibility alias for the current effective target shown as the obligation amount. */
   amount: number;
   originalAmount: number;
+  recordedAmount?: number | null;
   adjustmentTotal: number;
   effectiveTarget: number;
   activeReceived: number;
