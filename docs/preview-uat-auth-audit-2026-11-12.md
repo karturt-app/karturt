@@ -6,10 +6,11 @@ Tanggal pemeriksaan: 2026-11-12 (Asia/Bangkok)
 
 Catatan ini merekam penyelarasan Preview/UAT dan pemeriksaan halaman masuk. Pemeriksaan tetap pada Preview. Tidak ada kode aplikasi, akun, data Neon, konfigurasi Production, atau kredensial yang diubah. Tidak ada deployment atau promosi Production yang dijalankan.
 
-## Baseline dan status yang dilaporkan sebelumnya
+## Baseline dan status
 
 - **Production:** `main` berada pada `9b713bc38410227a601c144af3a0cd9451ccbcd6`. Status READY berasal dari laporan pemeriksaan sebelumnya dan tidak diulang dalam pemeriksaan ini.
-- **Sumber Preview/UAT:** branch `codex/uat-preview-node24-9b713bc`, commit `25e99a8a4b16f11e45807ac49a70c59128dc1dd1`. Commit tersebut hanya mematok `engines.node` menjadi `24.x` di `package.json`; baseline aplikasinya `9b713bc`.
+- **Sumber Preview/UAT:** branch `codex/uat-preview-node24-9b713bc`, commit `25e99a8a4b16f11e45807ac49a70c59128dc1dd1`. Pemeriksaan commit dan `package.json` mengonfirmasi perubahan hanya mematok `engines.node` menjadi `24.x`; baseline aplikasinya `9b713bc`.
+- **Deployment Preview:** pemeriksaan alias dan deployment Vercel mengonfirmasi URL Preview/UAT yang diberikan menunjuk ke deployment berstatus **READY** dari branch dan commit di atas.
 - **URL Preview/UAT:** https://karturt-v1-uat-preview-git-main-rt-6.vercel.app/
 - **Runtime dan akun Preview:** laporan sebelumnya menyebut Neon Preview pada PostgreSQL 18 dengan 19 migrasi dan lima akun uji (dua warga, satu Ketua RT, satu Bendahara, satu System Admin); tiga akun memiliki PIN. Tidak ada data warga yang disalin. Rincian tersebut tidak diperiksa ulang di sini.
 - **Kesehatan layanan:** laporan sebelumnya menyebut endpoint kesehatan dan halaman masuk merespons 200 serta TLS database terverifikasi. Endpoint kesehatan tidak diperiksa ulang dalam sesi ini.
