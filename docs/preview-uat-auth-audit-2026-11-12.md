@@ -8,12 +8,13 @@ Catatan ini merekam penyelarasan Preview/UAT dan pemeriksaan halaman masuk. Peme
 
 ## Baseline dan status
 
-- **Production:** `main` berada pada `9b713bc38410227a601c144af3a0cd9451ccbcd6`. Status READY berasal dari laporan pemeriksaan sebelumnya dan tidak diulang dalam pemeriksaan ini.
+- **Production:** `main` berada pada `9b713bc38410227a601c144af3a0cd9451ccbcd6`. Pemeriksaan Vercel pada project Production yang benar mengonfirmasi deployment Production terbaru **READY** pada SHA tersebut.
 - **Sumber Preview/UAT:** branch `codex/uat-preview-node24-9b713bc`, commit `25e99a8a4b16f11e45807ac49a70c59128dc1dd1`. Pemeriksaan commit dan `package.json` mengonfirmasi perubahan hanya mematok `engines.node` menjadi `24.x`; baseline aplikasinya `9b713bc`.
 - **Deployment Preview:** pemeriksaan alias dan deployment Vercel mengonfirmasi URL Preview/UAT yang diberikan menunjuk ke deployment berstatus **READY** dari branch dan commit di atas.
 - **URL Preview/UAT:** https://karturt-v1-uat-preview-git-main-rt-6.vercel.app/
 - **Runtime dan akun Preview:** laporan sebelumnya menyebut Neon Preview pada PostgreSQL 18 dengan 19 migrasi dan lima akun uji (dua warga, satu Ketua RT, satu Bendahara, satu System Admin); tiga akun memiliki PIN. Tidak ada data warga yang disalin. Rincian tersebut tidak diperiksa ulang di sini.
 - **Kesehatan layanan:** laporan sebelumnya menyebut endpoint kesehatan dan halaman masuk merespons 200 serta TLS database terverifikasi. Endpoint kesehatan tidak diperiksa ulang dalam sesi ini.
+- **Build branch catatan:** commit dokumentasi pada branch ini memicu build Preview otomatis di project Preview. Build branch ini terpisah dari target Production; tidak ada promosi atau deployment Production dari perubahan ini.
 
 ## Pemeriksaan browser pada 2026-11-12
 
