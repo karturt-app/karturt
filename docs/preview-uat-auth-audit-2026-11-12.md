@@ -74,3 +74,33 @@ Update ini menggantikan status operasional sebelumnya yang menyebut CLI belum te
 - **Environment lokal:** `vercel env pull` membuat file lokal `.uat-smoke/preview.env` dengan 28 entri; CLI melaporkan satu nilai sensitif tidak dapat ditarik. File ini, log CLI, dan skrip pemeriksaan tetap lokal dan dikecualikan dari Git. Tidak ada nilai file yang ditampilkan atau dicatat di GitHub.
 - **Pembersihan lokal:** folder `.uat-smoke` masih berada di checkout lokal. Upaya menghapus hanya file-file scratch tersebut ditolak oleh pemeriksaan keamanan lokal; isinya belum dihapus. Pemilik dapat menghapus folder ini sendiri setelah meninjaunya.
 - **Perlindungan Preview:** dashboard menampilkan keberhasilan pencabutan secret bypass yang baru dibuat oleh CLI; entri bypass baru itu sudah tidak ada. Shareable link yang lebih lama tetap tidak berubah.
+
+## Addendum diagnostik login Warga 2026-11-13
+
+Pemeriksaan ini hanya menggunakan metadata dan hasil Boolean pada Neon Preview/UAT yang telah dipastikan: project `quiet-credit-75135059`, branch `br-weathered-base-aodwvapx` (`preview-synthetic`), database `karturt_preview`. Tidak ada akun, PIN, kata sandi, hash, token, TOTP, data pribadi, atau URL koneksi yang dibaca untuk ditampilkan atau dicatat.
+
+### Hasil login yang dilaporkan pemilik
+
+| Peran | Hasil |
+|---|---|
+| Ketua RT | BERHASIL |
+| Bendahara | BERHASIL |
+| System Admin melalui `/system/login` | BERHASIL |
+| Warga | GAGAL; formulir menampilkan pesan generik bahwa nomor rumah atau PIN belum cocok |
+
+Hasil peran di atas merupakan laporan pemilik. Tidak ada login baru yang dikirim oleh pemeriksa.
+
+### Diagnostik Warga baca-saja
+
+- Dua akun Warga berstatus aktif. Kedua identifier cocok dengan nomor rumah yang terhubung; relasi rumah tangga/orang tersedia dan orang aktif.
+- Kedua masa hunian berstatus aktif tanpa tanggal akhir, tetapi tanggal mulai belum tercapai menurut tanggal bisnis Asia/Jakarta. Route `/api/login/[type]` mensyaratkan masa hunian sudah mulai dan nomor rumah masih cocok. Karena itu, kedua percobaan akan ditolak sebelum PIN diperiksa; pesan generik tersebut tidak membuktikan PIN yang dimasukkan salah.
+- Kedua akun memiliki PIN hash tersimpan dan tepat satu kredensial Better Auth dengan kata sandi terisi. Pemeriksaan kesamaan hash hanya menghasilkan Boolean: satu akun cocok dan satu tidak. Nilai hash/kredensial tidak dibaca atau dicatat, dan hasil ini tidak mengungkap PIN yang dimasukkan atau membuktikan PIN tertentu akan berhasil.
+- Kedua akun memiliki nol percobaan gagal yang tercatat pada penghitung akun dan tidak sedang terkunci. Identitas login tidak duplikat. Database Preview memiliki 19 migrasi.
+
+### Tindakan dan batasan
+
+Tidak ada perubahan kode, akun, database, atau Production; tidak ada rekey, reset PIN, ataupun permintaan login yang dikirim. Tidak dilakukan koreksi tanggal hunian karena tanggal tersebut adalah data efektif hunian yang dapat memengaruhi alur bisnis/tagihan; belum ada konfirmasi bahwa tanggalnya keliru. Ketidaksamaan hash pada satu akun juga tidak diperbaiki tanpa alur pemulihan PIN yang resmi.
+
+Status Warga tetap **GAGAL/menunggu tindakan pada data uji**, bukan BERHASIL. Untuk melanjutkan, pemilik perlu memastikan apakah kedua masa hunian sintetis memang seharusnya sudah efektif. Jika dikoreksi melalui proses data yang berwenang, pemilik dapat mengulangi login di halaman Preview `/login/warga` dan melaporkan hasil saja, tanpa mengirim PIN atau kredensial ke chat.
+
+Production tetap tidak berubah. Catatan ini diperbarui pada branch terpisah; belum digabungkan ke `main`.
