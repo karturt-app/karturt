@@ -255,6 +255,10 @@ export async function getRtFinancialReport(
     ) {
       throw new ReportInvariantError();
     }
+    const collectionTargetAmount = balance.collectionTarget - balance.adjustmentTotal;
+    if (!Number.isSafeInteger(collectionTargetAmount) || collectionTargetAmount < 0) {
+      throw new ReportInvariantError();
+    }
     const waiverEntries = waiversByDueId.get(due.id) ?? [];
     if (due.status === "waived") {
       if (waiverEntries.length !== 1) throw new ReportInvariantError();
@@ -287,6 +291,7 @@ export async function getRtFinancialReport(
       dueDate: due.dueDate,
       status: due.status,
       originalAmount: balance.originalAmount,
+      collectionTargetAmount,
       recordedAmount: balance.recordedAmount,
       adjustmentTotal: balance.adjustmentTotal,
       activeReceived: verifiedPaymentReceived,

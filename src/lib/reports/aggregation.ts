@@ -101,6 +101,7 @@ export type ReportDueInput = {
   dueDate: string;
   status: ReportDueStatus;
   originalAmount: number;
+  collectionTargetAmount?: number;
   recordedAmount?: number | null;
   adjustmentTotal: number;
   activeReceived: number;
@@ -234,7 +235,7 @@ function calculateDue(due: ReportDueInput, year: number, businessDate: string): 
     throw new ReportInvariantError("A monthly due has invalid period or identity details.");
   }
 
-  const targetAmount = safeInteger(due.originalAmount, "target amount");
+  const targetAmount = safeInteger(due.collectionTargetAmount ?? due.originalAmount, "target amount");
   const recordedAmount = due.recordedAmount ?? null;
   if (recordedAmount !== null && safeInteger(recordedAmount, "recorded amount") <= 0) {
     throw new ReportInvariantError("A recorded correction amount must be positive.");
