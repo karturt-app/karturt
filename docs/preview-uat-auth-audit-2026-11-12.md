@@ -65,3 +65,12 @@ Update ini menggantikan status operasional sebelumnya yang menyebut CLI belum te
 - **Project Vercel tambahan yang tidak disengaja:** pemanggilan `vercel env run` justru membuat project terpisah `check-token` di tim `rt-6`, dengan deployment `dpl_9ERmWxKizkM8f1KazanLGyC53zKt` berstatus READY dan target Vercel `production`. Ini bukan project atau deployment KartuRT; tidak mengandung perubahan kode KartuRT atau data Neon. Project dan deployment tersebut belum dihapus. Vercel menyediakan tautan penghapusan yang mengharuskan pemilik meninjau dan mengonfirmasi di dashboard.
 - **Kondisi KartuRT:** Preview/UAT tetap pada URL dan SHA `25e99a8a4b16f11e45807ac49a70c59128dc1dd1`; Production KartuRT tetap READY pada `main` / `9b713bc38410227a601c144af3a0cd9451ccbcd6`. Tidak ada kode KartuRT, akun/Neon, deployment KartuRT, atau konfigurasi project Production KartuRT yang diubah.
 - **Langkah manual:** pemilik dapat login warga memakai berkas lokal, menyiapkan PIN baru untuk dua akun pengurus melalui form Preview, dan menyelesaikan TOTP System Admin sendiri. Setelah setiap uji, cukup laporkan peran dan hasil lulus/gagal/terblokir agar audit diperbarui tanpa nilai sensitif. Project `check-token` dapat dihapus dari tautan Vercel yang diberikan di chat setelah pemilik meninjau dampaknya.
+
+
+## Addendum pemeriksaan 2026-11-13: status deployment dan file lokal
+
+- **UAT terkini:** pemeriksaan Vercel baca-saja mengonfirmasi deployment `dpl_99zAUWmrcEWfY5SEhPVQZgbrNvkZ` **READY** pada SHA `25e99a8a4b16f11e45807ac49a70c59128dc1dd1`; alias kanonis Preview/UAT tetap menunjuk ke deployment tersebut.
+- **Production KartuRT:** pemeriksaan Vercel baca-saja mengonfirmasi deployment Production terbaru **READY** pada `main` / `9b713bc38410227a601c144af3a0cd9451ccbcd6`.
+- **Environment lokal:** `vercel env pull` membuat file lokal `.uat-smoke/preview.env` dengan 28 entri; CLI melaporkan satu nilai sensitif tidak dapat ditarik. File ini, log CLI, dan skrip pemeriksaan tetap lokal dan dikecualikan dari Git. Tidak ada nilai file yang ditampilkan atau dicatat di GitHub.
+- **Pembersihan lokal:** folder `.uat-smoke` masih berada di checkout lokal. Upaya menghapus hanya file-file scratch tersebut ditolak oleh pemeriksaan keamanan lokal; isinya belum dihapus. Pemilik dapat menghapus folder ini sendiri setelah meninjaunya.
+- **Perlindungan Preview:** dashboard menampilkan keberhasilan pencabutan secret bypass yang baru dibuat oleh CLI; entri bypass baru itu sudah tidak ada. Shareable link yang lebih lama tetap tidak berubah.
