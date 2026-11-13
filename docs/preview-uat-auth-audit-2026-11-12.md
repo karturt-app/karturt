@@ -77,7 +77,7 @@ Update ini menggantikan status operasional sebelumnya yang menyebut CLI belum te
 
 ## Addendum diagnostik login Warga 2026-11-13
 
-Pemeriksaan ini hanya menggunakan metadata dan hasil Boolean pada Neon Preview/UAT yang telah dipastikan: project `quiet-credit-75135059`, branch `br-weathered-base-aodwvapx` (`preview-synthetic`), database `karturt_preview`. Tidak ada akun, PIN, kata sandi, hash, token, TOTP, data pribadi, atau URL koneksi yang dibaca untuk ditampilkan atau dicatat.
+Pemeriksaan ini hanya menggunakan metadata dan hasil Boolean pada Neon Preview/UAT yang telah dipastikan: project `quiet-credit-75135059`, branch `br-weathered-base-aodwvapx` (`preview-synthetic`), database `karturt_preview`. Nilai identifier akun, nama, telepon, PIN, kata sandi, hash, token, TOTP, dan URL koneksi tidak ditampilkan atau dicatat. Kueri hanya mengembalikan status, Boolean relasi/kesamaan hash, dan hitungan; nilai hash/kredensial tidak dikembalikan.
 
 ### Hasil login yang dilaporkan pemilik
 
