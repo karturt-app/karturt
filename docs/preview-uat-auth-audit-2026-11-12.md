@@ -104,3 +104,13 @@ Tidak ada perubahan kode, akun, database, atau Production; tidak ada rekey, rese
 Status Warga tetap **GAGAL/menunggu tindakan pada data uji**, bukan BERHASIL. Untuk melanjutkan, pemilik perlu memastikan apakah kedua masa hunian sintetis memang seharusnya sudah efektif. Jika dikoreksi melalui proses data yang berwenang, pemilik dapat mengulangi login di halaman Preview `/login/warga` dan melaporkan hasil saja, tanpa mengirim PIN atau kredensial ke chat.
 
 Production tetap tidak berubah. Catatan ini diperbarui pada branch terpisah; belum digabungkan ke `main`.
+
+## Addendum 2026-11-13: konfirmasi tanggal mulai dan batas koreksi
+
+Pemilik mengonfirmasi bahwa masa hunian untuk dua akun Warga sintetis seharusnya sudah berlaku pada tanggal bisnis sekarang (2026-11-13, Asia/Jakarta).
+
+- Pemeriksaan source pada baseline Preview `25e99a8a4b16f11e45807ac49a70c59128dc1dd1` menunjukkan route resmi `PATCH /api/chairman/households/[householdId]` hanya menerima perubahan nama, telepon, dan label rumah; tidak ada operasi untuk mengubah tanggal mulai.
+- Trigger database `households_guard_phase12_period_v1` melindungi `starts_on` sebagai nilai immutable dan menolak perubahan dengan constraint `household_identity_start_immutable`.
+- Karena tidak ada alur aplikasi yang disetujui untuk mengoreksi tanggal efektif tersebut, tidak ada SQL update, penonaktifan trigger, perubahan histori, reset PIN, atau perubahan akun yang dilakukan setelah konfirmasi pemilik. Kedua tanggal tetap seperti semula.
+- Akar blokir login saat ini tetap: tanggal mulai hunian kedua akun belum efektif. Penyelesaian memerlukan prosedur koreksi fixture UAT yang menjaga invariant histori hunian; prosedur seperti itu tidak tersedia pada alur aplikasi yang diperiksa.
+- Tidak ada perubahan Production. Catatan tetap berada di branch audit terpisah dan belum digabung ke `main`.
