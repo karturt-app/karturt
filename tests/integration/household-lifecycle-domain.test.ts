@@ -41,6 +41,8 @@ import { createAuthUser, createFeeRateFixture, createHousehold, createRt, create
 
 type TestDatabase = Awaited<ReturnType<typeof createTestDatabase>>;
 const businessDate = "2026-10-03";
+const transitionYear = new Date().getUTCFullYear() + 1;
+const transitionBusinessDate = `${transitionYear}-10-03`;
 
 describe("F12 household lifecycle domain services", () => {
   let testDatabase: TestDatabase;
@@ -83,10 +85,10 @@ describe("F12 household lifecycle domain services", () => {
     return { rtUnitId, original, chairman };
   }
 
-  async function openBillingYear(rtUnitId: string) {
+  async function openBillingYear(rtUnitId: string, billingYear = 2026) {
     const [year] = await testDatabase.db.insert(billingYears).values({
       rtUnitId,
-      year: 2026,
+      year: billingYear,
       status: "open",
     }).returning({ id: billingYears.id });
     await createFeeRateFixture(testDatabase.db, {
@@ -121,6 +123,7 @@ describe("F12 household lifecycle domain services", () => {
     householdId: string,
     billingYearId: string,
     notDueMonths: readonly number[] = [],
+    year = 2026,
   ) {
     const [feeRate] = await testDatabase.db.select({ id: feeRates.id })
       .from(feeRates).where(eq(feeRates.billingYearId, billingYearId)).limit(1);
@@ -131,7 +134,7 @@ describe("F12 household lifecycle domain services", () => {
       feeRateId: notDueMonths.includes(index + 1) ? null : feeRate!.id,
       month: index + 1,
       amount: notDueMonths.includes(index + 1) ? 0 : 40_000,
-      dueDate: `2026-${String(index + 1).padStart(2, "0")}-10`,
+      dueDate: `${year}-${String(index + 1).padStart(2, "0")}-10`,
       status: notDueMonths.includes(index + 1) ? "not_due" as const : "unpaid" as const,
     }))).returning({ id: monthlyDues.id, month: monthlyDues.month, status: monthlyDues.status });
   }
@@ -609,14 +612,14 @@ describe("F12 household lifecycle domain services", () => {
       personId: original.personId,
     });
     await addSession(account.authUserId);
-    const billingYearId = await openBillingYear(rtUnitId);
-    await addOldAnnualDues(rtUnitId, original.householdId, billingYearId);
+    const billingYearId = await openBillingYear(rtUnitId, transitionYear);
+    await addOldAnnualDues(rtUnitId, original.householdId, billingYearId, [], transitionYear);
 
     const result = await deactivateHousehold(database, chairman, {
       householdId: original.householdId,
-      effectiveMonth: "2026-10",
+      effectiveMonth: `${transitionYear}-10`,
       reason: "Pindah domisili sesuai permohonan",
-    }, businessDate);
+    }, transitionBusinessDate);
     const [household] = await testDatabase.db.select().from(households).where(eq(households.id, original.householdId));
     const [person] = await testDatabase.db.select().from(people).where(eq(people.id, original.personId));
     const [residentAccount] = await testDatabase.db.select().from(appAccounts).where(eq(appAccounts.id, account.appAccountId));
@@ -628,8 +631,8 @@ describe("F12 household lifecycle domain services", () => {
       eq(auditEvents.entityId, original.householdId),
     ));
 
-    expect(result).toMatchObject({ effectiveDate: "2026-10-31", disabledAccountCount: 1, revokedSessionCount: 1, transitionedDueCount: 2 });
-    expect(household).toMatchObject({ status: "inactive", endsOn: "2026-10-31" });
+    expect(result).toMatchObject({ effectiveDate: `${transitionYear}-10-31`, disabledAccountCount: 1, revokedSessionCount: 1, transitionedDueCount: 2 });
+    expect(household).toMatchObject({ status: "inactive", endsOn: `${transitionYear}-10-31` });
     expect(person?.isActive).toBe(false);
     expect(residentAccount?.status).toBe("disabled");
     expect(sessions).toHaveLength(0);
@@ -639,7 +642,7 @@ describe("F12 household lifecycle domain services", () => {
     expect(audits[0]?.reason).toBe("Pindah domisili sesuai permohonan");
     expect(audits[0]?.context).toEqual({
       disabledAccountCount: 1,
-      effectiveEndDate: "2026-10-31",
+      effectiveEndDate: `${transitionYear}-10-31`,
       revokedSessionCount: 1,
       transitionedDueCount: 2,
     });
@@ -701,17 +704,17 @@ describe("F12 household lifecycle domain services", () => {
       personId: original.personId,
     });
     await addSession(account.authUserId);
-    const billingYearId = await openBillingYear(rtUnitId);
-    await addOldAnnualDues(rtUnitId, original.householdId, billingYearId);
+    const billingYearId = await openBillingYear(rtUnitId, transitionYear);
+    await addOldAnnualDues(rtUnitId, original.householdId, billingYearId, [], transitionYear);
 
     const replaced = await replaceHouseholdResident(database, chairman, {
       householdId: original.householdId,
-      effectiveMonth: "2026-11",
+      effectiveMonth: `${transitionYear}-11`,
       fullName: "Penghuni Pengganti",
       phone: "081298765432",
       initialPin: "654321",
       reason: "Pergantian penghuni setelah serah terima",
-    }, businessDate);
+    }, transitionBusinessDate);
     const [oldAccount] = await testDatabase.db.select().from(appAccounts).where(eq(appAccounts.id, account.appAccountId));
     const [newAccount] = await testDatabase.db.select({ authUserId: appAccounts.authUserId })
       .from(appAccounts).where(eq(appAccounts.id, replaced.newResidentAccountId));
@@ -730,18 +733,18 @@ describe("F12 household lifecycle domain services", () => {
     ));
 
     expect(replaced).toMatchObject({
-      effectiveDate: "2026-11-01",
+      effectiveDate: `${transitionYear}-11-01`,
       transitionedDueCount: 2,
       generatedDueCount: 12,
     });
     expect(oldAccount?.status).toBe("disabled");
     expect(sessions).toHaveLength(0);
-    await expect(resolvePrincipalForUser(database, account.authUserId, businessDate)).rejects.toBeInstanceOf(UnauthenticatedError);
-    await expect(resolvePrincipalForUser(database, newAccount!.authUserId, businessDate)).rejects.toBeInstanceOf(UnauthenticatedError);
-    const newPrincipal = await resolvePrincipalForUser(database, newAccount!.authUserId, "2026-11-01");
+    await expect(resolvePrincipalForUser(database, account.authUserId, transitionBusinessDate)).rejects.toBeInstanceOf(UnauthenticatedError);
+    await expect(resolvePrincipalForUser(database, newAccount!.authUserId, transitionBusinessDate)).rejects.toBeInstanceOf(UnauthenticatedError);
+    const newPrincipal = await resolvePrincipalForUser(database, newAccount!.authUserId, `${transitionYear}-11-01`);
     expect(newPrincipal).toMatchObject({ householdId: replaced.newHouseholdId, personId: replaced.newPersonId, role: "resident" });
-    expect(oldHousehold).toMatchObject({ status: "inactive", endsOn: "2026-10-31" });
-    expect(newHousehold).toMatchObject({ status: "active", startsOn: "2026-11-01", endsOn: null });
+    expect(oldHousehold).toMatchObject({ status: "inactive", endsOn: `${transitionYear}-10-31` });
+    expect(newHousehold).toMatchObject({ status: "active", startsOn: `${transitionYear}-11-01`, endsOn: null });
     expect(oldDues.filter((due) => due.month <= 10).every((due) => due.status === "unpaid")).toBe(true);
     expect(oldDues.filter((due) => due.month >= 11).every((due) => due.status === "not_due")).toBe(true);
     expect(newDues.filter((due) => due.month <= 10).every((due) => due.status === "not_due")).toBe(true);
@@ -749,7 +752,7 @@ describe("F12 household lifecycle domain services", () => {
     expect(resolvedLogin?.id).toBe(replaced.newResidentAccountId);
     expect(replacementAudit?.reason).toBe("Pergantian penghuni setelah serah terima");
     expect(replacementAudit?.context).toMatchObject({
-      effectiveDate: "2026-11-01",
+      effectiveDate: `${transitionYear}-11-01`,
       newAccountId: replaced.newResidentAccountId,
       newHouseholdId: replaced.newHouseholdId,
       oldAccountId: account.appAccountId,
