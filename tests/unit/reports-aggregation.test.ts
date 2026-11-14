@@ -367,6 +367,32 @@ describe("F13 report aggregation", () => {
     expect(report.householdMatrix[0]?.months[10]).toMatchObject({ status: "unpaid", recordedAmount: 50_000, outstanding: 40_000 });
   });
 
+  it("reconciles a paid due against its corrected collection target", () => {
+    const identity = household({ householdId: "corrected-paid", houseNumber: "BLOKD1" });
+    const report = aggregateRtFinancialReport([
+      due(identity, 1, {
+        status: "paid",
+        originalAmount: 40_000,
+        collectionTargetAmount: 50_000,
+        recordedAmount: 50_000,
+        activeReceived: 50_000,
+        transferReceived: 50_000,
+      }),
+    ], { year: YEAR, availableYears: [YEAR], businessDate: BUSINESS_DATE });
+
+    expect(report.monthly[0]).toMatchObject({
+      target: 50_000,
+      effectiveTarget: 50_000,
+      received: 50_000,
+      transferReceived: 50_000,
+      outstanding: 0,
+    });
+    expect(report.yearly.effectiveTarget).toBe(
+      report.yearly.openingBalanceReceived + report.yearly.received + report.yearly.waived + report.yearly.outstanding,
+    );
+    expect(report.arrears).toMatchObject({ count: 0, totalOutstanding: 0 });
+  });
+
   it("fails closed on unsafe totals, method mismatches, invalid NOT_DUE activity, and inconsistent waiver amounts", () => {
     const identity = household({ householdId: "invalid", houseNumber: "A-06" });
     expect(() => aggregateRtFinancialReport([

@@ -60,6 +60,8 @@ type Scenario = {
 };
 
 const businessDate = "2026-10-03";
+const transitionYear = new Date().getUTCFullYear() + 1;
+const transitionBusinessDate = `${transitionYear}-10-03`;
 const initialPin = "804216";
 
 describe("Phase 12 household financial history safeguards", () => {
@@ -130,7 +132,8 @@ describe("Phase 12 household financial history safeguards", () => {
     }));
   }
 
-  async function createScenario(options: { resident?: boolean } = {}) {
+  async function createScenario(options: { resident?: boolean; year?: number } = {}) {
+    const year = options.year ?? 2026;
     const rtUnitId = await createRt(testDatabase.db);
     const chairman = await createOfficialPrincipal(rtUnitId, "rt_chairman");
     const treasurer = await createOfficialPrincipal(rtUnitId, "treasurer");
@@ -140,7 +143,7 @@ describe("Phase 12 household financial history safeguards", () => {
     });
     const [billingYear] = await testDatabase.db.insert(billingYears).values({
       rtUnitId,
-      year: 2026,
+      year,
       status: "open",
     }).returning({ id: billingYears.id });
     const [januaryRate] = await createFeeRateFixture(testDatabase.db, {
@@ -165,7 +168,7 @@ describe("Phase 12 household financial history safeguards", () => {
           feeRateId: month < 7 ? januaryRate!.id : julyRate!.id,
           month,
           amount: month < 7 ? 40_000 : 50_000,
-          dueDate: `2026-${String(month).padStart(2, "0")}-10`,
+          dueDate: `${year}-${String(month).padStart(2, "0")}-10`,
           status: "unpaid" as const,
         };
       }),
@@ -204,17 +207,17 @@ describe("Phase 12 household financial history safeguards", () => {
   }
 
   it("moves only untouched future unpaid dues to NOT_DUE and leaves arrears unwaived", async () => {
-    const scenario = await createScenario();
+    const scenario = await createScenario({ year: transitionYear });
     const before = await dueRows(scenario);
 
     const result = await deactivateHousehold(database, scenario.chairman, {
       householdId: scenario.household.householdId,
-      effectiveMonth: "2026-10",
+      effectiveMonth: `${transitionYear}-10`,
       reason: "Household ended after the October billing period.",
-    }, businessDate);
+    }, transitionBusinessDate);
 
     const after = await dueRows(scenario);
-    expect(result).toMatchObject({ effectiveDate: "2026-10-31", transitionedDueCount: 2 });
+    expect(result).toMatchObject({ effectiveDate: `${transitionYear}-10-31`, transitionedDueCount: 2 });
     expect(after.slice(0, 10)).toEqual(before.slice(0, 10));
     expect(after.slice(10).map(({ status, amount, feeRateId, waivedReason }) => ({ status, amount, feeRateId, waivedReason })))
       .toEqual([
@@ -365,43 +368,43 @@ describe("Phase 12 household financial history safeguards", () => {
   });
 
   it("replaces the resident without moving arrears or ledger history and scopes new reads to the new household", async () => {
-    const scenario = await createScenario({ resident: true });
+    const scenario = await createScenario({ resident: true, year: transitionYear });
     const originalResident = scenario.residentRecords!;
     const oldPrincipal = scenario.residentPrincipal!;
 
     const januaryRequest = await createResidentPaymentRequest(database, oldPrincipal, {
-      period: "2026-01",
+      period: `${transitionYear}-01`,
       idempotencyKey: randomUUID(),
-    });
-    await verifyTreasurerPaymentRequest(database, scenario.treasurer, januaryRequest.requestCode, businessDate);
+    }, transitionBusinessDate);
+    await verifyTreasurerPaymentRequest(database, scenario.treasurer, januaryRequest.requestCode, transitionBusinessDate);
     const [januaryPayment] = await testDatabase.db.select({ id: payments.id })
       .from(payments).innerJoin(paymentRequests, eq(paymentRequests.id, payments.paymentRequestId))
       .where(eq(paymentRequests.requestCode, januaryRequest.requestCode));
     await reverseTreasurerPayment(database, scenario.treasurer, {
       paymentId: januaryPayment!.id,
       reason: "Reverse the original resident payment to retain unpaid arrears.",
-    }, businessDate);
+    }, transitionBusinessDate);
 
     const januaryAdjustment = await createChairmanAdjustment(database, scenario.chairman, {
       monthlyDueId: scenario.dueIds.get(1)!,
       amountDelta: 1_000,
       reason: "Approved original-household arrears adjustment.",
       idempotencyKey: randomUUID(),
-    }, businessDate);
+    }, transitionBusinessDate);
     const waiverKey = randomUUID();
     await createChairmanWaiver(database, scenario.chairman, {
       householdId: scenario.household.householdId,
-      periods: ["2026-02"],
+      periods: [`${transitionYear}-02`],
       reason: "Approved original-household waiver history.",
       idempotencyKey: waiverKey,
-    }, businessDate);
+    }, transitionBusinessDate);
     const [oldWaiverAction] = await testDatabase.db.select({ id: waiverActions.id })
       .from(waiverActions).where(eq(waiverActions.idempotencyKey, waiverKey));
 
     const oldPendingRequest = await createResidentPaymentRequest(database, oldPrincipal, {
-      period: "2026-10",
+      period: `${transitionYear}-10`,
       idempotencyKey: randomUUID(),
-    });
+    }, transitionBusinessDate);
     const oldRequestRow = await testDatabase.db.select().from(paymentRequests)
       .where(eq(paymentRequests.requestCode, oldPendingRequest.requestCode));
     const januaryRequestRow = await testDatabase.db.select().from(paymentRequests)
@@ -414,16 +417,16 @@ describe("Phase 12 household financial history safeguards", () => {
 
     const result = await replaceHouseholdResident(database, scenario.chairman, {
       householdId: scenario.household.householdId,
-      effectiveMonth: "2026-11",
+      effectiveMonth: `${transitionYear}-11`,
       fullName: "Replacement Resident",
       initialPin: "624810",
       reason: "Household turnover effective at the November billing boundary.",
-    }, businessDate);
+    }, transitionBusinessDate);
 
     const afterHistory = await historySnapshot(scenario, oldRequestIds, [januaryPayment!.id], oldDueIds, historyEntityIds);
     expect(afterHistory).toEqual(beforeHistory);
     expect(result).toMatchObject({
-      effectiveDate: "2026-11-01",
+      effectiveDate: `${transitionYear}-11-01`,
       transitionedDueCount: 2,
       generatedDueCount: 12,
       disabledAccountCount: 1,
@@ -461,23 +464,23 @@ describe("Phase 12 household financial history safeguards", () => {
       ]);
     expect(await getResidentPaymentHistory(database, newResidentPrincipal)).toEqual({ payments: [], nextPage: null });
 
-    const management = await listHouseholdManagement(database, scenario.chairman, "", businessDate);
+    const management = await listHouseholdManagement(database, scenario.chairman, "", transitionBusinessDate);
     const oldSummary = management.households.find((item) => item.householdId === scenario.household.householdId);
     const newSummary = management.households.find((item) => item.householdId === result.newHouseholdId);
     expect(oldSummary?.financialHistory.arrearsAmount).toBeGreaterThan(0);
     expect(newSummary?.financialHistory).toMatchObject({ unpaidCount: 2, notDueCount: 10, arrearsAmount: 0 });
 
     const newRequest = await createResidentPaymentRequest(database, newResidentPrincipal, {
-      period: "2026-11",
+      period: `${transitionYear}-11`,
       idempotencyKey: randomUUID(),
-    }, "2026-11-01");
-    const queue = await getTreasurerPaymentRequestQueue(database, scenario.treasurer, "2026-11-01");
+    }, `${transitionYear}-11-01`);
+    const queue = await getTreasurerPaymentRequestQueue(database, scenario.treasurer, `${transitionYear}-11-01`);
     const oldQueueRequest = queue.find((item) => item.requestCode === oldPendingRequest.requestCode);
     const newQueueRequest = queue.find((item) => item.requestCode === newRequest.requestCode);
     expect(oldQueueRequest?.items.map((item) => item.period)).toEqual(
-      ["2026-01", ...Array.from({ length: 8 }, (_, index) => `2026-${String(index + 3).padStart(2, "0")}`)],
+      [`${transitionYear}-01`, ...Array.from({ length: 8 }, (_, index) => `${transitionYear}-${String(index + 3).padStart(2, "0")}`)],
     );
-    expect(newQueueRequest?.items.map((item) => item.period)).toEqual(["2026-11"]);
+    expect(newQueueRequest?.items.map((item) => item.period)).toEqual([`${transitionYear}-11`]);
     expect(oldQueueRequest?.houseNumber).toBe(newQueueRequest?.houseNumber);
   });
 
